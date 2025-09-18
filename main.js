@@ -48,7 +48,7 @@ function init() {
 
     raycaster = new THREE.Raycaster();
 
-    // <<< ELDEN RING STYLE ORBIT CONTROLS
+    
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
