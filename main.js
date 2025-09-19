@@ -3,415 +3,287 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 let scene, camera, renderer;
-let player, playerSpeed = 0.1;
+let player, playerSpeed = 4.0; // Increased speed slightly
 let keys = {};
 let mixer, clock = new THREE.Clock(), action;
 let cameraMode = 'thirdPerson';
 
+// Collision and camera variables
+let collidableObjects = [];
+let raycaster;
+const playerColliderRadius = 0.4;
+
 // First-person camera variables
 let firstPersonYaw = 0;
 let firstPersonPitch = 0;
-let isMouseDown = false;
+let isPointerLocked = false;
 let controls;
-let thirdPersonCamera;
 
-// Movement variables for smooth transitions
-let targetRotation = 0;
-let rotationSpeed = 0.1;
-let isMoving = false;
+// <<< NEW: Smooth camera target position
+const cameraTarget = new THREE.Vector3();
 
-// Improved ThirdPersonCamera class
-class ThirdPersonCamera {
-    constructor(camera, target) {
-        this.camera = camera;
-        this.target = target;
-        
-        // Camera offset relative to the target
-        this.offset = new THREE.Vector3(0, 1.5, 3);
-        this.smoothness = 0.1;
-        this.lookAtOffset = new THREE.Vector3(0, 0.8, 0);
-        
-        // For smooth camera movement
-        this.currentPosition = new THREE.Vector3();
-        this.currentLookat = new THREE.Vector3();
-    }
-
-    update(delta) {
-        if (!this.target) return;
-
-        // Calculate ideal camera position
-        const idealOffset = this.offset.clone();
-        idealOffset.applyQuaternion(this.target.quaternion);
-        const idealPosition = new THREE.Vector3().addVectors(this.target.position, idealOffset);
-        
-        // Smoothly move camera towards ideal position
-        this.currentPosition.lerp(idealPosition, this.smoothness);
-        this.camera.position.copy(this.currentPosition);
-        
-        // Calculate lookat point
-        const lookAtPoint = new THREE.Vector3().addVectors(this.target.position, this.lookAtOffset);
-        
-        // Smoothly adjust lookat
-        this.currentLookat.lerp(lookAtPoint, this.smoothness);
-        this.camera.lookAt(this.currentLookat);
-    }
-
-    setOffset(x, y, z) {
-        this.offset.set(x, y, z);
-    }
-
-    setLookAtOffset(x, y, z) {
-        this.lookAtOffset.set(x, y, z);
-    }
-
-    setSmoothness(value) {
-        this.smoothness = Math.max(0.01, Math.min(1, value));
-    }
+// For head visibility toggling
+function setHeadVisibility(visible) {
+    if (!player) return;
+    player.traverse((child) => {
+        if (child.isMesh && child.name.toLowerCase().includes("head")) {
+            child.visible = visible;
+        }
+    });
 }
 
 init();
 animate();
 
 function init() {
-    // Scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xa0a0a0);
+    scene.background = new THREE.Color(0x87CEEB);
 
-    // Camera
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(5, 3, 5);
-    camera.lookAt(0.5, 0.5, 0.5);
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 7);
 
-    // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // OrbitControls for third-person view (optional manual control)
+    raycaster = new THREE.Raycaster();
+
+    
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.enableZoom = true;
-    controls.enablePan = false;
-    controls.enabled = false; // Start disabled, we'll use ThirdPersonCamera
+    controls.enablePan = false; // Don't allow camera to move side-to-side
+    controls.minDistance = 1.5; // How close you can zoom
+    controls.maxDistance = 8.0;  // How far you can zoom
+    controls.minPolarAngle = Math.PI * 0.1; // Don't let camera go below character
+    controls.maxPolarAngle = Math.PI * 0.7; // Don't let camera go too high
+    controls.target.set(0, 1, 0);
 
-    // Lights
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.set(5, 10, 7.5);
     scene.add(dirLight);
-    scene.add(new THREE.AmbientLight(0x404040));
+    scene.add(new THREE.AmbientLight(0x666666));
 
-    // Ground
-    const groundGeometry = new THREE.PlaneGeometry(50, 50);
-    const groundMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x00aa00,
-        roughness: 0.8,
-        metalness: 0.2
-    });
+    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
     scene.add(ground);
+    collidableObjects.push(ground);
 
-    // Load GLB model
-    const loader = new GLTFLoader().setPath('public/running/');
-    loader.load(
-        'scene.gltf',
-        function (gltf) {
-            player = gltf.scene;
-            player.scale.set(1, 1, 1);
-            player.position.set(0, 0, 0);
-            scene.add(player);
+    const loader = new GLTFLoader();
 
-            // Initialize ThirdPersonCamera after player is loaded
-            thirdPersonCamera = new ThirdPersonCamera(camera, player);
+    loader.setPath('public/house/').load('scene.gltf', (gltf) => {
+        const house = gltf.scene;
+        house.position.set(5, 1.8, 5);
+        house.scale.set(1.5, 1.5, 1.5);
+        scene.add(house);
+        house.traverse((child) => {
+            if (child.isMesh) collidableObjects.push(child);
+        });
+    });
 
-            if (gltf.animations && gltf.animations.length > 0) {
-                mixer = new THREE.AnimationMixer(player);
-                action = mixer.clipAction(gltf.animations[0]);
-                action.play();
-                action.paused = true;
-            }
-        },
-        undefined,
-        function (error) {
-            console.error('Error loading GLB:', error);
-            // Add a simple cube as a fallback if model fails to load
-            const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-            const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-            player = new THREE.Mesh(cubeGeometry, cubeMaterial);
-            player.position.set(0, 0.5, 0);
-            scene.add(player);
-            thirdPersonCamera = new ThirdPersonCamera(camera, player);
+    loader.setPath('public/running/').load('scene.gltf', (gltf) => {
+        player = gltf.scene;
+        player.scale.set(0.5, 0.5, 0.5);
+        scene.add(player);
+        if (gltf.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(player);
+            action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+            action.paused = true;
         }
-    );
+        setHeadVisibility(true);
+    });
 
-    // WASD input
+    // Event Listeners
     window.addEventListener('keydown', (e) => {
         keys[e.key.toLowerCase()] = true;
-        
-        // Toggle camera mode (press 'c')
-        if (e.key.toLowerCase() === 'c') {
-            toggleCameraMode();
-        }
-        
-        // Camera adjustment keys (only in third-person mode)
-        if (cameraMode === 'thirdPerson' && thirdPersonCamera) {
-            if (e.key === 'ArrowUp') {
-                thirdPersonCamera.setOffset(
-                    thirdPersonCamera.offset.x,
-                    thirdPersonCamera.offset.y + 0.1,
-                    thirdPersonCamera.offset.z
-                );
-            }
-            if (e.key === 'ArrowDown') {
-                thirdPersonCamera.setOffset(
-                    thirdPersonCamera.offset.x,
-                    thirdPersonCamera.offset.y - 0.1,
-                    thirdPersonCamera.offset.z
-                );
-            }
-            if (e.key === 'ArrowLeft') {
-                thirdPersonCamera.setOffset(
-                    thirdPersonCamera.offset.x - 0.1,
-                    thirdPersonCamera.offset.y,
-                    thirdPersonCamera.offset.z
-                );
-            }
-            if (e.key === 'ArrowRight') {
-                thirdPersonCamera.setOffset(
-                    thirdPersonCamera.offset.x + 0.1,
-                    thirdPersonCamera.offset.y,
-                    thirdPersonCamera.offset.z
-                );
-            }
-            if (e.key === 'PageUp') {
-                thirdPersonCamera.setOffset(
-                    thirdPersonCamera.offset.x,
-                    thirdPersonCamera.offset.y,
-                    thirdPersonCamera.offset.z - 0.1
-                );
-            }
-            if (e.key === 'PageDown') {
-                thirdPersonCamera.setOffset(
-                    thirdPersonCamera.offset.x,
-                    thirdPersonCamera.offset.y,
-                    thirdPersonCamera.offset.z + 0.1
-                );
-            }
-        }
+        if (e.key.toLowerCase() === 'c') toggleCameraMode();
     });
     window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
-    // Mouse event listeners for first-person camera
     document.addEventListener('mousedown', () => {
-        if (cameraMode === 'firstPerson') isMouseDown = true;
+        if (cameraMode === 'firstPerson' && !isPointerLocked) {
+            renderer.domElement.requestPointerLock();
+        }
     });
-    document.addEventListener('mouseup', () => {
-        isMouseDown = false;
+    document.addEventListener('pointerlockchange', () => {
+        isPointerLocked = document.pointerLockElement === renderer.domElement;
     });
     document.addEventListener('mousemove', onMouseMove);
-
-    // Handle resize
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Add camera mode UI
     addCameraUI();
 }
 
 function onMouseMove(event) {
-    if (cameraMode === 'firstPerson' && isMouseDown && player) {
-        const deltaX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
-        const deltaY = event.movementY || event.mozMovementY || 0;
-
-        // Adjust yaw (horizontal rotation) and pitch (vertical rotation)
+    if (cameraMode === 'firstPerson' && isPointerLocked) {
+        const deltaX = event.movementX || 0;
+        const deltaY = event.movementY || 0;
         firstPersonYaw -= deltaX * 0.002;
-        firstPersonPitch -= deltaY * 0.002;
-
-        // Limit pitch to avoid flipping over
-        const maxPitch = Math.PI / 2 - 0.1;
-        const minPitch = -Math.PI / 2 + 0.1;
-        firstPersonPitch = Math.max(minPitch, Math.min(maxPitch, firstPersonPitch));
+        firstPersonPitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, firstPersonPitch - deltaY * 0.002));
     }
 }
 
 function toggleCameraMode() {
-    cameraMode = (cameraMode === 'thirdPerson') ? 'firstPerson' : 'thirdPerson';
-    console.log(`Camera mode: ${cameraMode}`);
-    
-    // Update controls based on camera mode
-    controls.enabled = (cameraMode === 'thirdPerson');
-    
-    // Reset first-person angles when switching
+    cameraMode = cameraMode === 'thirdPerson' ? 'firstPerson' : 'thirdPerson';
     if (cameraMode === 'firstPerson') {
-        firstPersonYaw = player ? player.rotation.y : 0;
+        firstPersonYaw = player.rotation.y;
         firstPersonPitch = 0;
+        setHeadVisibility(false);
+        renderer.domElement.requestPointerLock();
+    } else {
+        setHeadVisibility(true);
+        document.exitPointerLock();
     }
-    
-    // Update UI
     updateCameraUI();
 }
+// <<< NEW FUNCTION to add the UI container
+function addCameraUI() {
+    const uiContainer = document.createElement('div');
+    uiContainer.id = 'camera-ui';
+    uiContainer.style.position = 'absolute';
+    uiContainer.style.top = '10px';
+    uiContainer.style.left = '10px';
+    uiContainer.style.color = 'white';
+    uiContainer.style.backgroundColor = 'rgba(0,0,0,0.6)';
+    uiContainer.style.padding = '10px';
+    uiContainer.style.borderRadius = '8px';
+    uiContainer.style.fontFamily = 'Arial, sans-serif';
+    uiContainer.style.zIndex = '100';
+    document.body.appendChild(uiContainer);
+    updateCameraUI(); // Initial population
+}
 
+// <<< NEW FUNCTION to update UI text based on current state
+function updateCameraUI() {
+    const uiContainer = document.getElementById('camera-ui');
+    if (!uiContainer) return;
+
+    const modeName = cameraMode === 'thirdPerson' ? 'Third Person' : 'First Person';
+    let instructions = '';
+
+    if (cameraMode === 'thirdPerson') {
+        instructions = `
+            <b>Mouse:</b> Orbit Camera<br>
+            <b>Scroll:</b> Zoom In/Out
+        `;
+    } else {
+        instructions = `
+            <b>Click:</b> Lock Mouse<br>
+            <b>Mouse:</b> Look Around
+        `;
+    }
+
+    uiContainer.innerHTML = `
+        <strong>Camera: ${modeName}</strong><br>
+        <hr style="margin: 4px 0; border-color: rgba(255,255,255,0.3);">
+        <b>WASD:</b> Move Character<br>
+        <b>C:</b> Toggle Camera<br>
+        ${instructions}
+    `;
+}
+
+// <<< REBUILT PLAYER UPDATE LOGIC
+function updatePlayer(delta) {
+    if (!player || collidableObjects.length === 0) return;
+
+    const moveX = (keys['a'] ? 1 : 0) + (keys['d'] ? -1 : 0);
+    const moveZ = (keys['w'] ? 1 : 0) + (keys['s'] ? -1 : 0);
+    const isMoving = moveX !== 0 || moveZ !== 0;
+
+    if (action) action.paused = !isMoving;
+    if (!isMoving) return;
+
+    let moveDirection = new THREE.Vector3(moveX, 0, moveZ);
+    moveDirection.normalize();
+
+    // Player moves relative to the camera's direction
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
+    camDir.y = 0;
+    camDir.normalize();
+    const cameraAngle = Math.atan2(camDir.x, camDir.z);
+    moveDirection.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraAngle);
+
+    // Player rotates to face the direction of movement
+    const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+    const rotationLerpFactor = 0.15;
+    player.rotation.y = THREE.MathUtils.lerp(player.rotation.y, targetRotation, rotationLerpFactor);
+
+    const moveVector = moveDirection.multiplyScalar(playerSpeed * delta);
+
+    // Wall Collision
+    const playerCenter = player.position.clone().add(new THREE.Vector3(0, 1, 0));
+    raycaster.set(playerCenter, moveDirection);
+    raycaster.far = playerColliderRadius;
+    if (raycaster.intersectObjects(collidableObjects).length === 0) {
+        player.position.add(moveVector);
+    }
+
+    // Ground Snapping
+    const groundRayOrigin = player.position.clone().add(new THREE.Vector3(0, 1, 0));
+    raycaster.set(groundRayOrigin, new THREE.Vector3(0, -1, 0));
+    raycaster.far = 2.0;
+    const groundIntersects = raycaster.intersectObjects(collidableObjects);
+    if (groundIntersects.length > 0) {
+        player.position.y = groundIntersects[0].point.y;
+    }
+}
+
+
+// <<< REBUILT CAMERA UPDATE LOGIC
 function updateCamera(delta) {
     if (!player) return;
 
     if (cameraMode === 'thirdPerson') {
-        updateThirdPersonCamera(delta);
-    } else {
-        updateFirstPersonCamera();
-    }
-}
-
-function updateThirdPersonCamera(delta) {
-    if (thirdPersonCamera) {
-        thirdPersonCamera.update(delta);
-    }
-}
-
-function updateFirstPersonCamera() {
-    if (!player) return;
-
-    // Position camera at player's eye level
-    const eyeHeight = 1.7;
-    const headPos = player.position.clone();
-    headPos.y += eyeHeight;
-
-    // Calculate direction based on yaw and pitch
-    const direction = new THREE.Vector3(
-        Math.sin(firstPersonYaw) * Math.cos(firstPersonPitch),
-        Math.sin(firstPersonPitch),
-        -Math.cos(firstPersonYaw) * Math.cos(firstPersonPitch)
-    );
-    
-    // Position camera slightly in front of player's head
-    const cameraDistance = 0.3;
-    camera.position.copy(headPos).add(direction.multiplyScalar(-cameraDistance));
-    
-    // Make camera look in the direction of view
-    const lookAt = new THREE.Vector3().copy(headPos).add(direction);
-    camera.lookAt(lookAt);
-    
-    // Align player rotation with camera yaw (horizontal rotation only)
-    player.rotation.y = firstPersonYaw;
-    
-    // Hide head mesh so we don't see "inside the face"
-    player.traverse((child) => {
-        if (child.isMesh && child.name.toLowerCase().includes("head")) {
-            child.visible = false;
-        }
-    });
-}
-
-function addCameraUI() {
-    const cameraInfo = document.createElement('div');
-    cameraInfo.id = 'camera-ui';
-    cameraInfo.style.position = 'absolute';
-    cameraInfo.style.top = '10px';
-    cameraInfo.style.left = '10px';
-    cameraInfo.style.color = 'white';
-    cameraInfo.style.backgroundColor = 'rgba(0,0,0,0.7)';
-    cameraInfo.style.padding = '10px';
-    cameraInfo.style.borderRadius = '5px';
-    cameraInfo.style.fontFamily = 'Arial, sans-serif';
-    cameraInfo.style.zIndex = '1000';
-    document.body.appendChild(cameraInfo);
-    
-    updateCameraUI();
-}
-
-function updateCameraUI() {
-    const cameraInfo = document.getElementById('camera-ui');
-    if (cameraInfo) {
-        const modeName = cameraMode === 'thirdPerson' ? 'Third Person' : 'First Person';
-        let instructions = '';
+        controls.enabled = true;
         
-        if (cameraMode === 'firstPerson') {
-            instructions = 'Hold mouse to look around';
-        } else {
-            instructions = 'Arrow keys: Adjust camera position<br>Page Up/Down: Adjust distance';
+        // Smoothly move the camera target to the player's head height
+        const playerHead = player.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+        cameraTarget.lerp(playerHead, 0.1);
+        controls.target.copy(cameraTarget);
+        controls.update();
+
+        // Camera collision
+        const cameraPosition = camera.position.clone();
+        const cameraDirection = new THREE.Vector3().subVectors(cameraPosition, controls.target).normalize();
+        const distance = cameraPosition.distanceTo(controls.target);
+
+        raycaster.set(controls.target, cameraDirection);
+        raycaster.far = distance;
+        const intersects = raycaster.intersectObjects(collidableObjects);
+
+        if (intersects.length > 0) {
+            // Move camera to the collision point, slightly offset
+            camera.position.copy(intersects[0].point).addScaledVector(cameraDirection, -0.2);
         }
-        
-        cameraInfo.innerHTML = `
-            <strong>Camera: ${modeName}</strong><br>
-            Press C to toggle<br>
-            ${instructions}<br>
-            WASD to move
-        `;
+
+    } else { // First Person
+        controls.enabled = false;
+        player.rotation.y = firstPersonYaw; // Player model follows camera yaw
+        const eyeHeight = 1.5;
+        const headPos = player.position.clone().add(new THREE.Vector3(0, eyeHeight, 0));
+        const lookDirection = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(firstPersonPitch, firstPersonYaw, 0, 'YXZ'));
+        camera.position.copy(headPos);
+        camera.lookAt(headPos.add(lookDirection));
     }
 }
+
 
 function animate() {
     requestAnimationFrame(animate);
-
     const delta = clock.getDelta();
+
     if (mixer) mixer.update(delta);
 
-    if (player) {
-        // Detect movement
-        let moveX = 0, moveZ = 0;
-        if (keys['w']) moveZ -= playerSpeed;
-        if (keys['s']) moveZ += playerSpeed;
-        if (keys['a']) moveX -= playerSpeed;
-        if (keys['d']) moveX += playerSpeed;
-
-        // Update position based on current view
-        if (cameraMode === 'firstPerson') {
-            // First-person movement relative to camera direction
-            const direction = new THREE.Vector3();
-            camera.getWorldDirection(direction);
-            direction.y = 0;
-            direction.normalize();
-
-            const right = new THREE.Vector3();
-            right.crossVectors(new THREE.Vector3(0, 1, 0), direction).normalize();
-
-            player.position.add(direction.multiplyScalar(moveZ * playerSpeed));
-            player.position.add(right.multiplyScalar(moveX * playerSpeed));
-        } else {
-            // Third-person movement (original behavior)
-            player.position.x += moveX;
-            player.position.z += moveZ;
-        }
-
-        // Handle rotation smoothly for third-person view
-        if (cameraMode === 'thirdPerson') {
-            // Calculate movement direction if moving
-            if (moveX !== 0 || moveZ !== 0) {
-                // Calculate target rotation based on movement direction
-                const newTargetRotation = Math.atan2(moveX, moveZ);
-                
-                // Only update target rotation if it's significantly different
-                if (Math.abs(newTargetRotation - targetRotation) > 0.01) {
-                    targetRotation = newTargetRotation;
-                }
-                
-                // Smoothly interpolate towards target rotation
-                player.rotation.y = THREE.MathUtils.lerp(
-                    player.rotation.y, 
-                    targetRotation, 
-                    rotationSpeed
-                );
-                
-                if (action) action.paused = false;
-                isMoving = true;
-            } else {
-                if (action) action.paused = true;
-                isMoving = false;
-            }
-        } else if (moveX !== 0 || moveZ !== 0) {
-            // First-person view - just update animation
-            if (action) action.paused = false;
-        } else {
-            if (action) action.paused = true;
-        }
-
-        // Update camera
-        updateCamera(delta);
-    }
-
+    updatePlayer(delta);
+    updateCamera(delta);
+    
     renderer.render(scene, camera);
 }
