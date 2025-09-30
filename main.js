@@ -149,8 +149,8 @@ function init() {
     });
     loader.load('public/warehouse/scene.gltf', function(gltf2) {
         const warehouse = gltf2.scene;
-        warehouse.scale.set(50, 50, 50);
-        warehouse.position.set(500, 0, 0);
+        warehouse.scale.set(250, 250, 250);
+        warehouse.position.set(500, -1, 0);
         scene.add(warehouse);
         warehouse.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
     });
@@ -226,7 +226,7 @@ function toggleCameraMode() {
 }
 
 
-function loadPlayer() {
+function loadPlayer1() {
     const loader = new GLTFLoader().setPath('public/running/');
     loader.load('scene.gltf', function(gltf) {
         player = gltf.scene;
@@ -309,23 +309,51 @@ function showTrivia(sphere){
 }
 
 // Helper: snap the player to the nearest ground below them
-function snapPlayerToGround() {
+function snapPlayerToGround(force = false) {
     if (!player || collisionObjects.length === 0) return;
     const origin = player.position.clone();
-    origin.y += 200; // cast from well above the player to find ground reliably
+    origin.y += 500; // higher ray start to ensure detection
     raycaster.set(origin, new THREE.Vector3(0, -1, 0));
-    raycaster.far = 500;
+    raycaster.far = 1000;
     const intersects = raycaster.intersectObjects(collisionObjects, true);
     if (intersects.length > 0) {
-        player.position.y = intersects[0].point.y;
-        yVelocity = 0;
-        isGrounded = true;
+        const groundY = intersects[0].point.y;
+        // Use a wider tolerance
+        if (force || player.position.y <= groundY + 2) {
+            player.position.y = groundY + 2;
+            yVelocity = 0;
+            isGrounded = true;
+        }
     }
+}
+
+function loadPlayer() {
+    const loader = new GLTFLoader().setPath('public/running/');
+    loader.load('scene.gltf', function(gltf) {
+        player = gltf.scene;
+        player.scale.set(20, 20, 20);
+        player.position.copy(spawnPoint);
+        player.rotation.y = Math.PI;
+        scene.add(player);
+
+        if (gltf.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(player);
+            action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+            action.paused = true;
+        }
+        setHeadVisibility(true);
+
+        // snap immediately
+        snapPlayerToGround(true);
+    });
 }
 
 function enterWarehouse() {
     stage = 2;
-    player.position.set(515,0,-87);
+    player.scale.set(20, 20, 20);
+    player.position.set(515, -100, -87); // spawn slightly above floor
+    snapPlayerToGround(true);
     createCheckpoints(warehouseCheckpointData);
     clearInterval(timerInterval);
     totalTime = 120;
@@ -336,7 +364,8 @@ function enterWarehouse() {
 
 function enterApartment() {
     stage = 3;
-    player.position.set(-145,0,0);
+    player.position.set(-145, 200, 0);
+    snapPlayerToGround(true);
     createCheckpoints(apartmentCheckpointData);
     clearInterval(timerInterval);
     totalTime = 60;
@@ -579,7 +608,14 @@ function animate() {
 
     updatePlayer(delta);
     updateCamera(delta);
-    
+
+    // safety net – snap every 2s
+    idleTimer += delta;
+    if (idleTimer > 2.0) {
+        snapPlayerToGround();
+        idleTimer = 0;
+    }
+
     checkpoints.forEach(cp => {
         if (!isTriviaActive && player && player.position.distanceTo(cp.position) < 40) {
             showTrivia(cp);
