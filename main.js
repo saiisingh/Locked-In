@@ -101,6 +101,17 @@ function init() {
     camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 10000);
     camera.position.set(spawnPoint.x, spawnPoint.y + 200, spawnPoint.z + 100);
 
+
+       const cubeLoader = new THREE.CubeTextureLoader();
+        cubeLoader.setPath('public/skybox1/');
+        const skyboxTexture = cubeLoader.load([
+            'px.png', 'nx.png',
+            'py.png', 'ny.png',
+            'pz.png', 'nz.png'
+        ]);
+        scene.background = skyboxTexture;
+        
+
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
