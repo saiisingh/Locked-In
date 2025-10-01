@@ -2,8 +2,36 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+// --- Question Libraries ---
+// Easy (Stage 1)
+const easyQuestions = [
+    { question: "What color do you get when you mix red and white?", answers: ["Pink", "Purple", "Orange"], correct: "Pink" },
+    { question: "Which animal is known as the 'King of the Jungle'?", answers: ["Lion", "Tiger", "Elephant"], correct: "Lion" },
+    { question: "What is the largest planet in our solar system?", answers: ["Earth", "Jupiter", "Mars"], correct: "Jupiter" },
+    { question: "What do bees produce?", answers: ["Milk", "Honey", "Wax"], correct: "Honey" },
+    { question: "How many legs does a spider have?", answers: ["6", "8", "10"], correct: "8" }
+];
+
+// Medium (Stage 2)
+const mediumQuestions = [
+    { question: "Who wrote the play Romeo and Juliet?", answers: ["William Shakespeare", "Mark Twain", "Charles Dickens"], correct: "William Shakespeare" },
+    { question: "Who developed the theory of relativity?", answers: ["Newton","Einstein","Tesla"], correct: "Einstein" },
+    { question: "In which country would you find the city of Kyoto?", answers: ["Japan", "China", "South Korea"], correct: "Japan" },
+    { question: "Which gas do plants absorb from the atmosphere?", answers: ["Oxygen", "Carbon Dioxide", "Nitrogen"], correct: "Carbon Dioxide" },
+    { question: "What is the hardest natural substance on Earth?", answers: ["Gold", "Diamond", "Iron"], correct: "Diamond" }
+];
+
+// Hard (Stage 3)
+const hardQuestions = [
+    { question: "What is the capital of Mongolia?", answers: ["Ulaanbaatar", "Astana", "Tashkent"], correct: "Ulaanbaatar" },
+    { question: "Who painted the Garden of Earthly Delights?", answers: ["Hieronymus Bosch", "Leonardo da Vinci", "Michelangelo"], correct: "Hieronymus Bosch" },
+    { question: "What is the rarest naturally occurring element on Earth?", answers: ["Astatine", "Platinum", "Uranium"], correct: "Astatine" },
+    { question: "Which mathematician is known as the 'Prince of Mathematicians'?", answers: ["Euler", "Gauss", "Pythagoras"], correct: "Gauss" },
+    { question: "What was the name of the first man-made Earth satellite?", answers: ["Apollo 11", "Sputnik 1", "Voyager 1"], correct: "Sputnik 1" }
+];
 
 // --- Stage Checkpoint Data ---
+/*
 const streetCheckpointData = [
     { position: new THREE.Vector3(-3943,35,-3032), question: "What color do you get when you mix red and white?", answers: ["Pink", "Purple", "Orange"], correct: "Pink" },
     { position: new THREE.Vector3(-4193,35,-1446), question: "Which animal is known as the 'King of the Jungle'?", answers: ["Lion", "Tiger", "Elephant"], correct: "Lion" },
@@ -18,7 +46,7 @@ const apartmentCheckpointData = [
     { position: new THREE.Vector3(-120, 35, 10), question: "What is the capital of Mongolia?", answers: ["Ulaanbaatar", "Astana", "Tashkent"], correct: "Ulaanbaatar" },
     { position: new THREE.Vector3(-145, 35, -240), question: "Who painted the Garden of Earthly Delights?", answers: ["Hieronymus Bosch", "Leonardo da Vinci", "Michelangelo"], correct: "Hieronymus Bosch" },
     { position: new THREE.Vector3(-375, 35, -200), question: "What is the rarest naturally occurring element on Earth?", answers: ["Astatine", "Platinum", "Uranium"], correct: "Astatine" }
-];
+];*/
 
 
 // --- Global Variables ---
@@ -78,6 +106,11 @@ const playerHeight = 40;
 let idleTimer = 0;
 
 const cameraTarget = new THREE.Vector3();
+
+// ---- DEBUG: Skip to a stage for testing ----
+// 0 = disabled, 2 = warehouse, 3 = apartment
+//const DEBUG_SKIP_TO_STAGE = 0;
+
 
 
 // --- Init ---
@@ -147,28 +180,36 @@ function init() {
         scene.add(street);
         street.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
     });
-    loader.load('public/warehouse/scene.gltf', function(gltf2) {
+    loader.load('public/londonstreet/scene.gltf', function(gltf2) {
         const warehouse = gltf2.scene;
-        warehouse.scale.set(250, 250, 250);
-        warehouse.position.set(500, -1, 0);
+        warehouse.scale.set(50, 50, 50);
+        warehouse.position.set(500, 0, 0);
         scene.add(warehouse);
         warehouse.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
     });
-    loader.load('public/apartment/scene.gltf', function(gltf3) {
+    loader.load('public/alleyway/scene.gltf', function(gltf3) {
         const apartment = gltf3.scene;
-        apartment.scale.set(1, 1, 1);
-        apartment.position.set(0, 0, 0);
+        apartment.scale.set(600, 600, 600);
+        apartment.position.set(10000, 0, 0);
         scene.add(apartment);
         apartment.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
     });
 
     loadPlayer();
-    createCheckpoints(streetCheckpointData);
+    createCheckpoints();
     createUI();
     createTimer();
     setupEventListeners();
     startTimer();
-    hideLoadingScreen();
+    hideLoadingScreen();  
+
+   /* // DEBUG: optionally skip to a later stage for testing
+    if (typeof DEBUG_SKIP_TO_STAGE !== 'undefined' && DEBUG_SKIP_TO_STAGE > 1) {
+        // short delay to let glTF loaders and player creation start
+        setTimeout(() => debugSkipTo(DEBUG_SKIP_TO_STAGE), 800);
+    }
+*/
+    
 }
 
 
@@ -250,15 +291,50 @@ function createCheckpoints(data) {
     checkpoints = [];
     keysCollected = 0; // <<< RENAMED
     updateKeyCounter(); // <<< RENAMED
-    data.forEach(d => {
+    
+     // Select correct question pool
+    let questionPool;
+    let positions;
+    if(stage === 1){
+        questionPool = easyQuestions;
+        positions = [
+            new THREE.Vector3(-3943,35,-3032),
+            new THREE.Vector3(-4193,35,-1446),
+            new THREE.Vector3(-5679,35,-92)
+        ];
+    } else if(stage === 2){
+        questionPool = mediumQuestions;
+        positions = [
+            new THREE.Vector3(300,35,2000),
+            new THREE.Vector3(668,35,1000),
+            new THREE.Vector3(632,35,-222)
+        ];
+    } else {
+        questionPool = hardQuestions;
+        positions = [
+            new THREE.Vector3(10100, 35, 1000),
+            new THREE.Vector3(10000, 35, 2000),
+            new THREE.Vector3(10000, 35, 200)
+        ];
+    }
+
+    // Pick 3 random unique questions
+    const selected = [];
+    while(selected.length < 3){
+        const rand = questionPool[Math.floor(Math.random() * questionPool.length)];
+        if(!selected.includes(rand)) selected.push(rand);
+    }
+
+    // Create spheres
+    for(let i=0; i<3; i++){
         const geometry = new THREE.SphereGeometry(3,32,32);
         const material = new THREE.MeshStandardMaterial({color:0xffff00});
         const sphere = new THREE.Mesh(geometry, material);
-        sphere.position.copy(d.position);
-        sphere.trivia = { question: d.question, answers: d.answers, correct: d.correct };
+        sphere.position.copy(positions[i]);
+        sphere.trivia = selected[i];
         scene.add(sphere);
         checkpoints.push(sphere);
-    });
+    }
 }
 
 function showTrivia(sphere){
@@ -292,7 +368,7 @@ function showTrivia(sphere){
                 triviaDiv.remove();
 
                 // ensure player is snapped back to ground to avoid falling through
-                snapPlayerToGround();
+                //snapPlayerToGround();
 
                 if(checkpoints.length === 0 && isTimerRunning){
                     if(stage === 1) enterWarehouse();
@@ -352,27 +428,73 @@ function loadPlayer() {
 function enterWarehouse() {
     stage = 2;
     player.scale.set(20, 20, 20);
-    player.position.set(515, -100, -87); // spawn slightly above floor
+    player.position.set(515, 0, -87); // spawn slightly above floor
     snapPlayerToGround(true);
-    createCheckpoints(warehouseCheckpointData);
+    createCheckpoints();
     clearInterval(timerInterval);
     totalTime = 120;
     remainingTime = totalTime;
     startTimer();
-    alert("Welcome to the Warehouse! Collect 3 keys!"); // <<< RENAMED
+    alert("Welcome to London! Collect 3 keys!"); // <<< RENAMED
 }
 
 function enterApartment() {
     stage = 3;
-    player.position.set(-145, 200, 0);
+    player.scale.set(20, 20, 20);
+    player.position.set(10000, 0, 1000);
     snapPlayerToGround(true);
-    createCheckpoints(apartmentCheckpointData);
+    createCheckpoints();
     clearInterval(timerInterval);
     totalTime = 60;
     remainingTime = totalTime;
     startTimer();
-    alert("Final Stage: The Apartment! Collect 3 keys!"); // <<< RENAMED
+    alert("Final Stage: The Alleyway! Collect 3 keys!"); // <<< RENAMED
 }
+
+/*function debugSkipTo(stageNum){
+    if(!player){
+        // if player isn't loaded yet, try again shortly
+        setTimeout(() => debugSkipTo(stageNum), 250);
+        return;
+    }
+
+    if(stageNum === 2){
+        stage = 2;
+        // Move player to the warehouse spawn used in enterWarehouse
+        player.position.set(515, 0, -87);
+        player.scale.set(20,20,20);
+        snapPlayerToGround(true);
+
+        // Build checkpoints for stage 2
+        createCheckpoints(); // createCheckpoints reads `stage` and picks mediumQuestions & positions
+        clearInterval(timerInterval);
+        totalTime = 120;
+        remainingTime = totalTime;
+        startTimer();
+
+        isTriviaActive = false;
+        isMenuOpen = false;
+        alert("DEBUG: Skipped to Warehouse (Stage 2)");
+    }
+    else if(stageNum === 3){
+        stage = 3;
+        player.position.set(10000, 0, 1000);
+        player.scale.set(20,20,20);
+        snapPlayerToGround(true);
+
+        // Build checkpoints for stage 3
+        createCheckpoints();
+        clearInterval(timerInterval);
+        totalTime = 60;
+        remainingTime = totalTime;
+        startTimer();
+
+        isTriviaActive = false;
+        isMenuOpen = false;
+        alert("DEBUG: Skipped to Apartment (Stage 3)");
+    }
+}*/
+
 
 // (Win/Lose, Timer, Loading Screen, and Menu functions remain unchanged)
 // --- Win/Lose ---
@@ -453,6 +575,7 @@ function createUI() {
     instructionsDiv.style.position = 'absolute'; instructionsDiv.style.bottom = '10px'; instructionsDiv.style.left = '10px'; instructionsDiv.style.padding = '10px'; instructionsDiv.style.backgroundColor = 'rgba(0,0,0,0.5)'; instructionsDiv.style.color = 'white'; instructionsDiv.style.fontFamily = 'Arial'; instructionsDiv.style.fontSize = '14px'; instructionsDiv.style.borderRadius = '5px'; instructionsDiv.style.zIndex = '100';
     document.body.appendChild(instructionsDiv);
     updateInstructionsUI();
+    
 }
 
 function updateInstructionsUI() {
@@ -621,6 +744,8 @@ function animate() {
             showTrivia(cp);
         }
     });
+
+    
 
     renderer.render(scene, camera);
 }

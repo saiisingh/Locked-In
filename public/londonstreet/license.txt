@@ -1,0 +1,11 @@
+Model Information:
+* title:	Greater London Highstreet/Shops
+* source:	https://sketchfab.com/3d-models/greater-london-highstreetshops-a80514d7781d4a388885ed00c263eb35
+* author:	Pukka Films (https://sketchfab.com/pukkafilms)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Greater London Highstreet/Shops" (https://sketchfab.com/3d-models/greater-london-highstreetshops-a80514d7781d4a388885ed00c263eb35) by Pukka Films (https://sketchfab.com/pukkafilms) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
