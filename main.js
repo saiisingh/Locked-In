@@ -30,25 +30,6 @@ const hardQuestions = [
     { question: "What was the name of the first man-made Earth satellite?", answers: ["Apollo 11", "Sputnik 1", "Voyager 1"], correct: "Sputnik 1" }
 ];
 
-// --- Stage Checkpoint Data ---
-/*
-const streetCheckpointData = [
-    { position: new THREE.Vector3(-3943,35,-3032), question: "What color do you get when you mix red and white?", answers: ["Pink", "Purple", "Orange"], correct: "Pink" },
-    { position: new THREE.Vector3(-4193,35,-1446), question: "Which animal is known as the 'King of the Jungle'?", answers: ["Lion", "Tiger", "Elephant"], correct: "Lion" },
-    { position: new THREE.Vector3(-5679,35,-92), question: "What is the largest planet in our solar system?", answers: ["Earth", "Jupiter", "Mars"], correct: "Jupiter"}
-];
-const warehouseCheckpointData = [
-    { position: new THREE.Vector3(494,35,-294), question: "Who wrote the play Romeo and Juliet?", answers: ["William Shakespeare", "Mark Twain", "Charles Dickens"], correct: "William Shakespeare" },
-    { position: new THREE.Vector3(668,35,-294), question: "Who developed the theory of relativity?", answers: ["Newton","Einstein","Tesla"], correct: "Einstein" },
-    { position: new THREE.Vector3(632,35,-222), question: "In which country would you find the city of Kyoto?", answers: ["Japan", "China", "South Korea"], correct: "Japan" }
-];
-const apartmentCheckpointData = [
-    { position: new THREE.Vector3(-120, 35, 10), question: "What is the capital of Mongolia?", answers: ["Ulaanbaatar", "Astana", "Tashkent"], correct: "Ulaanbaatar" },
-    { position: new THREE.Vector3(-145, 35, -240), question: "Who painted the Garden of Earthly Delights?", answers: ["Hieronymus Bosch", "Leonardo da Vinci", "Michelangelo"], correct: "Hieronymus Bosch" },
-    { position: new THREE.Vector3(-375, 35, -200), question: "What is the rarest naturally occurring element on Earth?", answers: ["Astatine", "Platinum", "Uranium"], correct: "Astatine" }
-];*/
-
-
 // --- Global Variables ---
 let scene, camera, renderer;
 let player;
@@ -57,7 +38,7 @@ let mixer, clock = new THREE.Clock(), action;
 let checkpoints = [];
 let currentCheckpoint = null;
 let isTriviaActive = false;
-let menuDiv, keyCounterDiv; // <<< RENAMED
+let menuDiv, keyCounterDiv;
 let isMenuOpen = false;
 let loadingScreenDiv;
 
@@ -74,28 +55,25 @@ let isTimerRunning = false;
 // Player spawn point
 const spawnPoint = new THREE.Vector3(-2265, 0, -32);
 
-
 let keysCollected = 0;
 
 // Collision detection
 let collisionObjects = []; 
 const raycaster = new THREE.Raycaster();
 
-// Variables for the movement and camera system
+// Movement and camera
 let playerBaseSpeed = 250.0; 
 const sprintMultiplier = 1.5;
 let cameraMode = 'thirdPerson';
 let controls; 
-
-// Collision and camera variables
 const playerColliderRadius = 15; 
 
-// First-person camera variables
+// First-person camera
 let firstPersonYaw = 0;
 let firstPersonPitch = 0;
 let isPointerLocked = false;
 
-// Physics variables
+// Physics
 let yVelocity = 0;
 const gravity = -90; 
 const jumpStrength = 70; 
@@ -105,13 +83,18 @@ const playerHeight = 40;
 // Idle snap timer (seconds)
 let idleTimer = 0;
 
+// Audio
+let listener, runningSound;
+let pingSound;
+let victorySound;
+let deathSound;
+
+
+
+
+
+//let playerShadow;
 const cameraTarget = new THREE.Vector3();
-
-// ---- DEBUG: Skip to a stage for testing ----
-// 0 = disabled, 2 = warehouse, 3 = apartment
-//const DEBUG_SKIP_TO_STAGE = 0;
-
-
 
 // --- Init ---
 init();
@@ -126,7 +109,6 @@ function setHeadVisibility(visible) {
     });
 }
 
-
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xa0a0a0);
@@ -134,16 +116,49 @@ function init() {
     camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 10000);
     camera.position.set(spawnPoint.x, spawnPoint.y + 200, spawnPoint.z + 100);
 
+        // Audio listener
+    listener = new THREE.AudioListener();
+    camera.add(listener);
 
-       const cubeLoader = new THREE.CubeTextureLoader();
-        cubeLoader.setPath('public/skybox1/');
-        const skyboxTexture = cubeLoader.load([
-            'px.png', 'nx.png',
-            'py.png', 'ny.png',
-            'pz.png', 'nz.png'
-        ]);
-        scene.background = skyboxTexture;
-        
+    // Running sound
+    runningSound = new THREE.PositionalAudio(listener);
+    const audioLoader = new THREE.AudioLoader();
+    audioLoader.load('public/audio/runaudio.mp3', function(buffer){
+        runningSound.setBuffer(buffer);
+        runningSound.setLoop(true);
+        runningSound.setVolume(20);
+    });
+
+    pingSound = new THREE.Audio(listener);
+    audioLoader.load('public/audio/ping.mp3', function(buffer){
+    pingSound.setBuffer(buffer);
+    pingSound.setLoop(false);
+    pingSound.setVolume(10);
+});
+
+    victorySound = new THREE.Audio(listener);
+    audioLoader.load('public/audio/winner.mp3', function(buffer){
+    victorySound.setBuffer(buffer);
+    victorySound.setLoop(false);
+    victorySound.setVolume(10);
+});
+
+    deathSound = new THREE.Audio(listener);
+    audioLoader.load('public/audio/lose.mp3', function(buffer){
+    deathSound.setBuffer(buffer);
+    deathSound.setLoop(false);
+    deathSound.setVolume(10);
+});
+
+
+    const cubeLoader = new THREE.CubeTextureLoader();
+    cubeLoader.setPath('public/skybox1/');
+    const skyboxTexture = cubeLoader.load([
+        'px.png', 'nx.png',
+        'py.png', 'ny.png',
+        'pz.png', 'nz.png'
+    ]);
+    scene.background = skyboxTexture;
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -153,7 +168,6 @@ function init() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enablePan = false;
-  
     controls.minDistance = 35;  
     controls.maxDistance = 120; 
     controls.minPolarAngle = Math.PI * 0.1;
@@ -172,13 +186,28 @@ function init() {
     const loader = new GLTFLoader();
     showLoadingScreen();
 
-    // Load scenes and set up for collision
+    // Load all GLTFs and only snap player after all loaded
+    let modelsToLoad = 3;
+    function onModelLoad() {
+        modelsToLoad--;
+        if (modelsToLoad === 0) {
+            loadPlayer();
+            createCheckpoints();
+            createUI();
+            createTimer();
+            setupEventListeners();
+            startTimer();
+            hideLoadingScreen();
+        }
+    }
+
     loader.load('public/street/scene.gltf', function(gltf) {
         const street = gltf.scene;
         street.scale.set(600, 600, 600);
         street.position.set(-4000, 0, 0);
         scene.add(street);
         street.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
+        onModelLoad();
     });
     loader.load('public/londonstreet/scene.gltf', function(gltf2) {
         const warehouse = gltf2.scene;
@@ -186,6 +215,7 @@ function init() {
         warehouse.position.set(500, 0, 0);
         scene.add(warehouse);
         warehouse.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
+        onModelLoad();
     });
     loader.load('public/alleyway/scene.gltf', function(gltf3) {
         const apartment = gltf3.scene;
@@ -193,24 +223,22 @@ function init() {
         apartment.position.set(10000, 0, 0);
         scene.add(apartment);
         apartment.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
+        onModelLoad();
     });
+}
 
-    loadPlayer();
-    createCheckpoints();
-    createUI();
-    createTimer();
-    setupEventListeners();
-    startTimer();
-    hideLoadingScreen();  
+// --- Remaining code unchanged (loadPlayer, createCheckpoints, showTrivia, updatePlayer, updateCamera, animate, UI, menu, timer, win/lose logic) ---
 
-   /* // DEBUG: optionally skip to a later stage for testing
+
+
+    /*// DEBUG: optionally skip to a later stage for testing
     if (typeof DEBUG_SKIP_TO_STAGE !== 'undefined' && DEBUG_SKIP_TO_STAGE > 1) {
         // short delay to let glTF loaders and player creation start
         setTimeout(() => debugSkipTo(DEBUG_SKIP_TO_STAGE), 800);
-    }
-*/
+    }*/
+
     
-}
+
 
 
 function setupEventListeners() {
@@ -289,10 +317,10 @@ function loadPlayer1() {
 
 function createCheckpoints(data) {
     checkpoints = [];
-    keysCollected = 0; // <<< RENAMED
-    updateKeyCounter(); // <<< RENAMED
-    
-     // Select correct question pool
+    keysCollected = 0; 
+    updateKeyCounter();
+
+    // Select correct question pool
     let questionPool;
     let positions;
     if(stage === 1){
@@ -327,15 +355,62 @@ function createCheckpoints(data) {
 
     // Create spheres
     for(let i=0; i<3; i++){
-        const geometry = new THREE.SphereGeometry(3,32,32);
-        const material = new THREE.MeshStandardMaterial({color:0xffff00});
+        // --- Vibrant Glowy Sphere ---
+        const geometry = new THREE.SphereGeometry(3, 32, 32);
+        const material = new THREE.MeshStandardMaterial({
+            color: 0xffff00,          // bright yellow
+            emissive: 0xffcc00,       // makes it glow
+            emissiveIntensity: 1.5,
+            metalness: 0.3,
+            roughness: 0.2
+        });
         const sphere = new THREE.Mesh(geometry, material);
         sphere.position.copy(positions[i]);
         sphere.trivia = selected[i];
+
+        sphere.baseY = positions[i].y;
+
         scene.add(sphere);
         checkpoints.push(sphere);
+
+        // --- Add a glowing light source for extra effect ---
+        const glow = new THREE.PointLight(0xffdd33, 1.2, 50); // soft golden glow
+        glow.position.copy(positions[i]);
+        scene.add(glow);
+
+                    // --- Circular Shadow under sphere ---
+            const shadowGeo = new THREE.CircleGeometry(6, 32);
+            const shadowMat = new THREE.MeshBasicMaterial({
+                color: 0x000000,
+                transparent: true,
+                opacity: 0.4,
+                side: THREE.DoubleSide
+            });
+            const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+            shadow.rotation.x = -Math.PI / 2; // flat on ground
+
+            // Raycast downward to find the ground under the sphere
+            const raycaster = new THREE.Raycaster();
+            const down = new THREE.Vector3(0, -1, 0);
+            raycaster.set(new THREE.Vector3(positions[i].x, positions[i].y + 100, positions[i].z), down);
+            const intersects = raycaster.intersectObjects(collisionObjects, true);
+
+            if (intersects.length > 0) {
+                shadow.position.copy(intersects[0].point);
+                shadow.position.y += 0.05; // lift slightly to avoid z-fighting
+            } else {
+                // fallback: just put shadow at y = 0
+                shadow.position.set(positions[i].x, 0.05, positions[i].z);
+            }
+
+            scene.add(shadow);
+
+            // Link shadow to sphere
+            sphere.shadowCircle = shadow;
+
     }
 }
+
 
 function showTrivia(sphere){
     // Pause gameplay and show trivia UI
@@ -354,6 +429,8 @@ function showTrivia(sphere){
         btn.onclick = () => {
             if(ans === data.correct){
                 alert("Correct!");
+                if (pingSound.isPlaying) pingSound.stop();
+                pingSound.play();
                 keysCollected++; // <<< RENAMED
                 updateKeyCounter(); // <<< RENAMED
 
@@ -412,6 +489,9 @@ function loadPlayer() {
         player.rotation.y = Math.PI;
         scene.add(player);
 
+        player.add(runningSound);
+
+
         if (gltf.animations.length > 0) {
             mixer = new THREE.AnimationMixer(player);
             action = mixer.clipAction(gltf.animations[0]);
@@ -422,6 +502,21 @@ function loadPlayer() {
 
         // snap immediately
         snapPlayerToGround(true);
+
+        /*// --- CREATE CIRCULAR SHADOW ---
+        const shadowGeo = new THREE.CircleGeometry(10, 32); // radius 10, smoothness 32 segments
+        const shadowMat = new THREE.MeshBasicMaterial({ 
+            color: 0x000000, 
+            transparent: true, 
+            opacity: 0.4, 
+            side: THREE.DoubleSide // makes it visible from both sides
+        });
+        playerShadow = new THREE.Mesh(shadowGeo, shadowMat);
+        playerShadow.rotation.x = -Math.PI / 2; // lay flat
+        playerShadow.position.y = 0.1; // slightly above ground
+        scene.add(playerShadow);
+        */
+
     });
 }
 
@@ -499,6 +594,9 @@ function enterApartment() {
 // (Win/Lose, Timer, Loading Screen, and Menu functions remain unchanged)
 // --- Win/Lose ---
 function finalWin() {
+    if (victorySound.isPlaying) victorySound.stop();
+    victorySound.play();
+
     isTriviaActive = true; clearInterval(timerInterval); isTimerRunning = false;
     const winDiv = document.createElement('div'); winDiv.id = 'winDiv';
     // (Styles are unchanged)
@@ -509,6 +607,9 @@ function finalWin() {
     winDiv.appendChild(restartBtn); winDiv.appendChild(quitBtn); document.body.appendChild(winDiv);
 }
 function handleDeath() {
+    if (deathSound.isPlaying) deathSound.stop();
+    deathSound.play();
+
     isTriviaActive = true;
     const deathDiv = document.createElement('div');
     // (Styles are unchanged)
@@ -643,16 +744,20 @@ function updatePlayer(delta) {
         if (raycaster.intersectObjects(collisionObjects, true).length === 0) {
             player.position.add(moveVector);
         }
+        if (!runningSound.isPlaying) runningSound.play();
         // reset idle timer when moving
         idleTimer = 0;
+        
     }
     else {
         // accumulate idle time when standing still
         idleTimer += delta;
+         if (runningSound.isPlaying) runningSound.stop();
         if (idleTimer > 3.0) {
             // periodically re-snap to ground to avoid slow drift-through
             snapPlayerToGround();
             idleTimer = 0;
+         
         }
     }
 
@@ -731,6 +836,18 @@ function animate() {
 
     updatePlayer(delta);
     updateCamera(delta);
+    
+
+            // Make spheres pulse
+        const time = Date.now() * 0.003; // slow pulse
+        checkpoints.forEach((sphere, index) => {
+            if (sphere.material && sphere.material.emissive) {
+                // Pulse between 0.5 and 2.0
+                const intensity = 1 + Math.sin(time + index) * 0.5;
+                sphere.material.emissiveIntensity = intensity;
+            }
+        sphere.position.y = sphere.baseY + Math.sin(time + index) * 2; // amplitude = 2
+        });
 
     // safety net – snap every 2s
     idleTimer += delta;
