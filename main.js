@@ -186,6 +186,22 @@ function init() {
     const loader = new GLTFLoader();
     showLoadingScreen();
 
+            // === Invisible Fallback Floor ===
+        const fallbackFloorGeometry = new THREE.PlaneGeometry(60000, 60000); // really big
+        const fallbackFloorMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.0 // fully invisible
+        });
+        const fallbackFloor = new THREE.Mesh(fallbackFloorGeometry, fallbackFloorMaterial);
+        fallbackFloor.rotation.x = -Math.PI / 2; // make it flat (horizontal)
+        fallbackFloor.position.y = -5; // just below the player’s spawn height
+        scene.add(fallbackFloor);
+
+        // Add to collision objects so the player can walk on it
+        collisionObjects.push(fallbackFloor);
+
+
     // Load all GLTFs and only snap player after all loaded
     let modelsToLoad = 3;
     function onModelLoad() {
@@ -225,6 +241,8 @@ function init() {
         apartment.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
         onModelLoad();
     });
+
+    
 }
 
 // --- Remaining code unchanged (loadPlayer, createCheckpoints, showTrivia, updatePlayer, updateCamera, animate, UI, menu, timer, win/lose logic) ---
