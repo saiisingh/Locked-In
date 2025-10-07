@@ -8,6 +8,10 @@ const easyQuestions = [
     { question: "What color do you get when you mix red and white?", answers: ["Pink", "Purple", "Orange"], correct: "Pink" },
     { question: "Which animal is known as the 'King of the Jungle'?", answers: ["Lion", "Tiger", "Elephant"], correct: "Lion" },
     { question: "What is the largest planet in our solar system?", answers: ["Earth", "Jupiter", "Mars"], correct: "Jupiter" },
+    { question: "How many continents are there on Earth?", answers: ["5", "6", "7"], correct: "7" },
+    { question: "What do bees collect from flowers?", answers: ["Nectar", "Pollen", "Water"], correct: "Nectar" },
+    { question: "Which ocean is the largest?", answers: ["Atlantic", "Indian", "Pacific"], correct: "Pacific" },
+    { question: "What is the main ingredient in guacamole?", answers: ["Tomato", "Avocado", "Potato"], correct: "Avocado" },
     { question: "What do bees produce?", answers: ["Milk", "Honey", "Wax"], correct: "Honey" },
     { question: "How many legs does a spider have?", answers: ["6", "8", "10"], correct: "8" }
 ];
@@ -17,6 +21,10 @@ const mediumQuestions = [
     { question: "Who wrote the play Romeo and Juliet?", answers: ["William Shakespeare", "Mark Twain", "Charles Dickens"], correct: "William Shakespeare" },
     { question: "Who developed the theory of relativity?", answers: ["Newton","Einstein","Tesla"], correct: "Einstein" },
     { question: "In which country would you find the city of Kyoto?", answers: ["Japan", "China", "South Korea"], correct: "Japan" },
+    { question: "What is the capital city of Australia?", answers: ["Sydney", "Canberra", "Melbourne"], correct: "Canberra" },
+    { question: "Which element has the chemical symbol 'Fe'?", answers: ["Iron", "Fluorine", "Lead"], correct: "Iron" },
+    { question: "Which language has the most native speakers worldwide?", answers: ["English", "Mandarin Chinese", "Spanish"], correct: "Mandarin Chinese" },
+    { question: "In computing, what does 'CPU' stand for?", answers: ["Central Processing Unit", "Computer Personal Unit", "Central Program Utility"], correct: "Central Processing Unit" },
     { question: "Which gas do plants absorb from the atmosphere?", answers: ["Oxygen", "Carbon Dioxide", "Nitrogen"], correct: "Carbon Dioxide" },
     { question: "What is the hardest natural substance on Earth?", answers: ["Gold", "Diamond", "Iron"], correct: "Diamond" }
 ];
@@ -26,8 +34,13 @@ const hardQuestions = [
     { question: "What is the capital of Mongolia?", answers: ["Ulaanbaatar", "Astana", "Tashkent"], correct: "Ulaanbaatar" },
     { question: "Who painted the Garden of Earthly Delights?", answers: ["Hieronymus Bosch", "Leonardo da Vinci", "Michelangelo"], correct: "Hieronymus Bosch" },
     { question: "What is the rarest naturally occurring element on Earth?", answers: ["Astatine", "Platinum", "Uranium"], correct: "Astatine" },
+    { question: "Which ancient civilization built the city of Machu Picchu?", answers: ["Maya", "Inca", "Aztec"], correct: "Inca" },
+    { question: "What is the term for a word that is spelled the same forwards and backwards?", answers: ["Anagram", "Palindrome", "Oxymoron"], correct: "Palindrome" },
+    { question: "In Greek mythology, who is the god of the underworld?", answers: ["Hades", "Poseidon", "Zeus"], correct: "Hades" },
     { question: "Which mathematician is known as the 'Prince of Mathematicians'?", answers: ["Euler", "Gauss", "Pythagoras"], correct: "Gauss" },
-    { question: "What was the name of the first man-made Earth satellite?", answers: ["Apollo 11", "Sputnik 1", "Voyager 1"], correct: "Sputnik 1" }
+    { question: "What was the name of the first man-made Earth satellite?", answers: ["Apollo 11", "Sputnik 1", "Voyager 1"], correct: "Sputnik 1" },
+    { question: "What What does a funambulist walk on?", answers: ["A tightrope", "A balance beam", "A suspension bridge"], correct: "A tightrope" },
+
 ];
 
 // --- Global Variables ---
@@ -633,9 +646,78 @@ function finalWin() {
     winDiv.style.position = 'absolute'; winDiv.style.top = '50%'; winDiv.style.left = '50%'; winDiv.style.transform = 'translate(-50%, -50%)'; winDiv.style.padding = '20px'; winDiv.style.backgroundColor = 'rgba(0,0,0,0.9)'; winDiv.style.color = 'white'; winDiv.style.fontFamily = 'Arial'; winDiv.style.fontSize = '24px'; winDiv.style.textAlign = 'center'; winDiv.style.borderRadius = '10px'; winDiv.style.zIndex = '300';
     winDiv.innerHTML = "<p>Congratulations! You completed all stages!</p>";
     const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.onclick = () => location.reload();
-    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.onclick = () => window.close();
-    winDiv.appendChild(restartBtn); winDiv.appendChild(quitBtn); document.body.appendChild(winDiv);
+    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
+    const creditsBtn = document.createElement('button');
+    creditsBtn.innerText = 'View Credits';
+    creditsBtn.style.margin = '10px';
+    creditsBtn.style.padding = '10px 20px';
+    creditsBtn.onclick = showCredits;
+    winDiv.appendChild(restartBtn); winDiv.appendChild(quitBtn); 
+    winDiv.appendChild(creditsBtn);
+    document.body.appendChild(winDiv);
 }
+
+// --- Credits screen ---
+function showCredits() {
+    const creditsDiv = document.createElement('div');
+    creditsDiv.id = 'creditsDiv';
+    creditsDiv.style.position = 'fixed';
+    creditsDiv.style.top = '0';
+    creditsDiv.style.left = '0';
+    creditsDiv.style.width = '100%';
+    creditsDiv.style.height = '100%';
+    creditsDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.95)';
+    creditsDiv.style.color = 'white';
+    creditsDiv.style.fontFamily = 'Arial';
+    creditsDiv.style.textAlign = 'center';
+    creditsDiv.style.overflow = 'hidden';
+    creditsDiv.style.zIndex = '400';
+    
+    const creditsContent = document.createElement('div');
+    creditsContent.style.position = 'absolute';
+    creditsContent.style.bottom = '-100%';
+    creditsContent.style.width = '100%';
+    creditsContent.style.animation = 'scrollCredits 15s linear forwards';
+
+    creditsContent.innerHTML = `
+        <h2>Game Credits</h2>
+        <p>Game Design and Programming: </p>
+        <p>Sayuri Singh</p>
+        <p>Masuvhelele Thembiso</p>
+        <p>Aphile</p>
+        <p>Samu</p>
+        <p>Onana</p>
+        <p>Character model sourced from https://sketchfab.com/3d-models/rida-sidi-ben-ali-running-487e9e949e4a4ea3a8fd59df7e842830</p>
+        <p>Level one model sourced from https://sketchfab.com/3d-models/low-poly-street-scene-d238a2d27e324b78af3ab15e2a09faeb</p>
+        <p>Level two model sourced from https://sketchfab.com/3d-models/greater-london-highstreetshops-a80514d7781d4a388885ed00c263eb35</p>
+        <p>Level three model sourced from https://sketchfab.com/3d-models/sunset-alleyway-a48c2b12a7084a4e80057516f4f448c4</p>
+        <p>Special Thanks: You, the Player!</p>
+        <p style="margin-top:40px;">🏆 Thank you for playing! 🏆</p>
+    `;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerText = 'Close';
+    closeBtn.style.position = 'absolute';
+    closeBtn.style.top = '20px';
+    closeBtn.style.right = '20px';
+    closeBtn.style.padding = '10px 20px';
+    closeBtn.onclick = () => creditsDiv.remove();
+
+    creditsDiv.appendChild(creditsContent);
+    creditsDiv.appendChild(closeBtn);
+    document.body.appendChild(creditsDiv);
+
+    // CSS animation for scrolling credits
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes scrollCredits {
+            0% { bottom: -100%; }
+            100% { bottom: 100%; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
 function handleDeath() {
     if (deathSound.isPlaying) deathSound.stop();
     deathSound.play();
@@ -646,7 +728,7 @@ function handleDeath() {
     deathDiv.style.position = 'absolute'; deathDiv.style.top = '50%'; deathDiv.style.left = '50%'; deathDiv.style.transform = 'translate(-50%, -50%)'; deathDiv.style.padding = '20px'; deathDiv.style.backgroundColor = 'rgba(0,0,0,0.9)'; deathDiv.style.color = 'white'; deathDiv.style.fontFamily = 'Arial'; deathDiv.style.fontSize = '24px'; deathDiv.style.textAlign = 'center'; deathDiv.style.borderRadius = '10px'; deathDiv.style.zIndex = '300';
     deathDiv.innerHTML = "<p>You have died!</p>";
     const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.onclick = () => location.reload();
-    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.onclick = () => window.close();
+    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
     deathDiv.appendChild(restartBtn); deathDiv.appendChild(quitBtn); document.body.appendChild(deathDiv);
 }
 // --- Timer ---
@@ -729,7 +811,7 @@ function createMenu() {
     const buttonContainer = document.createElement('div'); buttonContainer.style.marginTop = '20px';
     const resumeBtn = document.createElement('button'); resumeBtn.innerText = 'Resume'; resumeBtn.style.margin = '10px'; resumeBtn.style.padding = '10px 20px'; resumeBtn.style.fontSize = '16px'; resumeBtn.style.borderRadius = '5px'; resumeBtn.style.border = 'none'; resumeBtn.style.backgroundColor = '#4CAF50'; resumeBtn.style.color = 'white'; resumeBtn.style.cursor = 'pointer'; resumeBtn.onclick = () => toggleMenu();
     const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.style.fontSize = '16px'; restartBtn.style.borderRadius = '5px'; restartBtn.style.border = 'none'; restartBtn.style.backgroundColor = '#f44336'; restartBtn.style.color = 'white'; restartBtn.style.cursor = 'pointer'; restartBtn.onclick = () => location.reload();
-    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.style.fontSize = '16px'; quitBtn.style.borderRadius = '5px'; quitBtn.style.border = 'none'; quitBtn.style.backgroundColor = '#555'; quitBtn.style.color = 'white'; quitBtn.style.cursor = 'pointer'; quitBtn.onclick = () => window.close();
+    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.style.fontSize = '16px'; quitBtn.style.borderRadius = '5px'; quitBtn.style.border = 'none'; quitBtn.style.backgroundColor = '#555'; quitBtn.style.color = 'white'; quitBtn.style.cursor = 'pointer'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
     buttonContainer.appendChild(resumeBtn); buttonContainer.appendChild(restartBtn); buttonContainer.appendChild(quitBtn);
     menuDiv.appendChild(title); menuDiv.appendChild(controls); menuDiv.appendChild(buttonContainer); document.body.appendChild(menuDiv);
 }
