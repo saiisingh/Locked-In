@@ -109,6 +109,16 @@ function setHeadVisibility(visible) {
     });
 }
 
+// Hide or show the entire player model (all meshes) – useful for first-person mode
+function setPlayerVisibility(visible) {
+    if (!player) return;
+    player.traverse((child) => {
+        if (child.isMesh) {
+            child.visible = visible;
+        }
+    });
+}
+
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xa0a0a0);
@@ -302,10 +312,12 @@ function toggleCameraMode() {
     if (cameraMode === 'firstPerson') {
         firstPersonYaw = player.rotation.y;
         firstPersonPitch = 0;
-        setHeadVisibility(false);
+        // Hide full player model so the camera shows only the world
+        setPlayerVisibility(false);
         renderer.domElement.requestPointerLock();
     } else {
-        setHeadVisibility(true);
+        // Show player again in third-person
+        setPlayerVisibility(true);
         document.exitPointerLock();
     }
     const instructionsDiv = document.getElementById('instructions-ui');
@@ -834,14 +846,19 @@ function updateCamera(delta) {
         player.rotation.y = firstPersonYaw;
         const eyeHeight = playerHeight * 0.9;
         const headPos = player.position.clone().add(new THREE.Vector3(0, eyeHeight, 0));
-        const lookDirection = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(firstPersonPitch, firstPersonYaw, 0, 'YXZ'));
         
-        // <<< FIXED: Position camera slightly in front of the head to avoid clipping
-        const cameraPosition = headPos.clone().addScaledVector(lookDirection, 5);
-        camera.position.copy(cameraPosition);
-
-        // Look further ahead in the same direction for a stable view
-        const lookAtTarget = headPos.addScaledVector(lookDirection, 100);
+        // Position camera at the head position (player's eye level)
+        camera.position.copy(headPos);
+        
+        // Calculate look direction based on yaw and pitch
+        const lookDirection = new THREE.Vector3(
+            Math.sin(firstPersonYaw) * Math.cos(firstPersonPitch),
+            Math.sin(firstPersonPitch),
+            Math.cos(firstPersonYaw) * Math.cos(firstPersonPitch)
+        );
+        
+        // Look at a point in the direction the player is facing
+        const lookAtTarget = headPos.clone().add(lookDirection);
         camera.lookAt(lookAtTarget);
     }
 }
