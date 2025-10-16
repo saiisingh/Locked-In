@@ -1,0 +1,11 @@
+Model Information:
+* title:	HL2 Stalker Rig
+* source:	https://sketchfab.com/3d-models/hl2-stalker-rig-0aa86bf47aac4d64b6e7d2e2b5778d3e
+* author:	NO DONT EAT ME CASEOH (Ferris wheel) (https://sketchfab.com/NO.DONT.EAT.ME.CASEOH)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "HL2 Stalker Rig" (https://sketchfab.com/3d-models/hl2-stalker-rig-0aa86bf47aac4d64b6e7d2e2b5778d3e) by NO DONT EAT ME CASEOH (Ferris wheel) (https://sketchfab.com/NO.DONT.EAT.ME.CASEOH) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

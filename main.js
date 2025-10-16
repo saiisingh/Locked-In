@@ -54,60 +54,46 @@ let isTriviaActive = false;
 let menuDiv, keyCounterDiv;
 let isMenuOpen = false;
 let loadingScreenDiv;
-
-// Stage tracking
 let stage = 1;
-
-// Timer
 let timerDiv;
 let totalTime = 180;
 let remainingTime = totalTime;
 let timerInterval;
 let isTimerRunning = false;
-
-// Player spawn point
 const spawnPoint = new THREE.Vector3(-2265, 0, -32);
-
 let keysCollected = 0;
-
-// Collision detection
 let collisionObjects = []; 
 const raycaster = new THREE.Raycaster();
-
-// Movement and camera
 let playerBaseSpeed = 250.0; 
 const sprintMultiplier = 1.5;
 let cameraMode = 'thirdPerson';
 let controls; 
 const playerColliderRadius = 15; 
-
-// First-person camera
 let firstPersonYaw = 0;
 let firstPersonPitch = 0;
 let isPointerLocked = false;
-
-// Physics
 let yVelocity = 0;
 const gravity = -90; 
 const jumpStrength = 70; 
 let isGrounded = false;
 const playerHeight = 40; 
-
-// Idle snap timer (seconds)
 let idleTimer = 0;
-
-// Audio
 let listener, runningSound;
 let pingSound;
 let victorySound;
 let deathSound;
-
-
-
-
-
-//let playerShadow;
 const cameraTarget = new THREE.Vector3();
+
+// --- ADDED: Stalker variables ---
+let stalker; // This will hold the model itself
+let stalkerContainer;
+let stalkerMixer;
+let stalkerAction;
+const stalkerSpeed = 50.0; // Slower than the player's base speed
+const stalkerCollisionDistance = 30; // Collision radius
+
+// --- Shadow Variables ---
+let playerShadow;
 
 // --- Init ---
 init();
@@ -122,7 +108,6 @@ function setHeadVisibility(visible) {
     });
 }
 
-// Hide or show the entire player model (all meshes) – useful for first-person mode
 function setPlayerVisibility(visible) {
     if (!player) return;
     player.traverse((child) => {
@@ -135,11 +120,12 @@ function setPlayerVisibility(visible) {
 function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xa0a0a0);
+    scene.fog = new THREE.Fog(0xa0a0a0, 500, 10000);
 
     camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 10000);
     camera.position.set(spawnPoint.x, spawnPoint.y + 200, spawnPoint.z + 100);
 
-        // Audio listener
+    // Audio listener
     listener = new THREE.AudioListener();
     camera.add(listener);
 
@@ -154,25 +140,24 @@ function init() {
 
     pingSound = new THREE.Audio(listener);
     audioLoader.load('public/audio/ping.mp3', function(buffer){
-    pingSound.setBuffer(buffer);
-    pingSound.setLoop(false);
-    pingSound.setVolume(10);
-});
+        pingSound.setBuffer(buffer);
+        pingSound.setLoop(false);
+        pingSound.setVolume(10);
+    });
 
     victorySound = new THREE.Audio(listener);
     audioLoader.load('public/audio/winner.mp3', function(buffer){
-    victorySound.setBuffer(buffer);
-    victorySound.setLoop(false);
-    victorySound.setVolume(10);
-});
+        victorySound.setBuffer(buffer);
+        victorySound.setLoop(false);
+        victorySound.setVolume(10);
+    });
 
     deathSound = new THREE.Audio(listener);
     audioLoader.load('public/audio/lose.mp3', function(buffer){
-    deathSound.setBuffer(buffer);
-    deathSound.setLoop(false);
-    deathSound.setVolume(10);
-});
-
+        deathSound.setBuffer(buffer);
+        deathSound.setLoop(false);
+        deathSound.setVolume(10);
+    });
 
     const cubeLoader = new THREE.CubeTextureLoader();
     cubeLoader.setPath('public/skybox1/');
@@ -183,8 +168,23 @@ function init() {
     ]);
     scene.background = skyboxTexture;
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Enhanced renderer with shadow support
+    renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        powerPreference: "high-performance"
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    
+    // Shadow configuration
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = true;
+    
+    renderer.physicallyCorrectLights = true;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1;
+    
     document.body.appendChild(renderer.domElement);
     
     controls = new OrbitControls(camera, renderer.domElement);
@@ -197,11 +197,8 @@ function init() {
     controls.maxPolarAngle = Math.PI * 0.7;
     controls.target.set(spawnPoint.x, spawnPoint.y + playerHeight / 2, spawnPoint.z);
 
-    // Lighting
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-    dirLight.position.set(5, 10, 7.5);
-    scene.add(dirLight);
-    scene.add(new THREE.AmbientLight(0x404040));
+    // --- ENHANCED LIGHTING WITH SHADOWS ---
+    setupLightingWithShadows();
 
     createLoadingScreen();
     createMenu();
@@ -209,28 +206,27 @@ function init() {
     const loader = new GLTFLoader();
     showLoadingScreen();
 
-            // === Invisible Fallback Floor ===
-        const fallbackFloorGeometry = new THREE.PlaneGeometry(60000, 60000); // really big
-        const fallbackFloorMaterial = new THREE.MeshBasicMaterial({
+    // === Invisible Fallback Floor ===
+    const fallbackFloorGeometry = new THREE.PlaneGeometry(60000, 60000);
+    const fallbackFloorMaterial = new THREE.MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
-        opacity: 0.0 // fully invisible
-        });
-        const fallbackFloor = new THREE.Mesh(fallbackFloorGeometry, fallbackFloorMaterial);
-        fallbackFloor.rotation.x = -Math.PI / 2; // make it flat (horizontal)
-        fallbackFloor.position.y = -5; // just below the player’s spawn height
-        scene.add(fallbackFloor);
+        opacity: 0.0
+    });
+    const fallbackFloor = new THREE.Mesh(fallbackFloorGeometry, fallbackFloorMaterial);
+    fallbackFloor.rotation.x = -Math.PI / 2;
+    fallbackFloor.position.y = -5;
+    fallbackFloor.receiveShadow = true; // Floor receives shadows
+    scene.add(fallbackFloor);
+    collisionObjects.push(fallbackFloor);
 
-        // Add to collision objects so the player can walk on it
-        collisionObjects.push(fallbackFloor);
-
-
-    // Load all GLTFs and only snap player after all loaded
-    let modelsToLoad = 3;
+    // --- MODIFIED: Load all GLTFs, including the new stalker ---
+    let modelsToLoad = 4; // Increased from 3 to 4
     function onModelLoad() {
         modelsToLoad--;
         if (modelsToLoad === 0) {
             loadPlayer();
+            spawnStalker(); // Spawn stalker for the first time
             createCheckpoints();
             createUI();
             createTimer();
@@ -244,108 +240,231 @@ function init() {
         const street = gltf.scene;
         street.scale.set(600, 600, 600);
         street.position.set(-4000, 0, 0);
+        setupModelShadows(street);
         scene.add(street);
-        street.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
+        street.traverse(child => { 
+            if (child.isMesh) {
+                collisionObjects.push(child);
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
         onModelLoad();
     });
+    
     loader.load('public/londonstreet/scene.gltf', function(gltf2) {
         const warehouse = gltf2.scene;
         warehouse.scale.set(50, 50, 50);
         warehouse.position.set(500, 0, 0);
+        setupModelShadows(warehouse);
         scene.add(warehouse);
-        warehouse.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
+        warehouse.traverse(child => { 
+            if (child.isMesh) {
+                collisionObjects.push(child);
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
         onModelLoad();
     });
+    
     loader.load('public/alleyway/scene.gltf', function(gltf3) {
         const apartment = gltf3.scene;
         apartment.scale.set(600, 600, 600);
         apartment.position.set(10000, 0, 0);
+        setupModelShadows(apartment);
         scene.add(apartment);
-        apartment.traverse(child => { if (child.isMesh) collisionObjects.push(child); });
+        apartment.traverse(child => { 
+            if (child.isMesh) {
+                collisionObjects.push(child);
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
         onModelLoad();
     });
 
-    
+    // --- ADDED: Load the stalker model ---
+    loader.load('public/stalker/scene.gltf', function(gltf) {
+        stalker = gltf.scene;
+        
+        
+        stalker.scale.set(30, 30, 30);
+        
+        // --- ADDED: Fix the model's orientation by rotating it to stand upright ---
+        stalker.rotation.x = 2*Math.PI ;
+        stalker.rotation.y =2*Math.PI ;
+        
+        
+        
+        stalker.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+            }
+        });
+        
+        // --- ADDED: Use a container for world positioning and rotation ---
+        stalkerContainer = new THREE.Group();
+        stalkerContainer.add(stalker); // Add the rotated model to the container
+        stalkerContainer.visible = false; // Initially hidden
+        scene.add(stalkerContainer);
+        
+         if (gltf.animations) {
+        stalkerMixer = new THREE.AnimationMixer(stalker);
+        stalkerAction = stalkerMixer.clipAction(gltf.animations[3]);
+        stalkerAction.setLoop(THREE.LoopRepeat);
+        stalkerAction.play(); 
+    }
+        onModelLoad();
+    });
 }
 
-// --- Remaining code unchanged (loadPlayer, createCheckpoints, showTrivia, updatePlayer, updateCamera, animate, UI, menu, timer, win/lose logic) ---
+// --- ADDED: Function to spawn the stalker based on the current stage ---
+function spawnStalker() {
+    if (!stalker || !stalkerAction) return;
 
+    let stalkerSpawnPoint;
+    if (stage === 1) {
+        stalkerSpawnPoint = new THREE.Vector3(-4167, 0, 1672); // Far corner of the street
+    } else if (stage === 2) {
+        stalkerSpawnPoint = new THREE.Vector3(299, 0, -318); // Back of the warehouse area
+    } else { // Stage 3
+        stalkerSpawnPoint = new THREE.Vector3(10101, 35, 1634); // End of the alleyway
+    }
 
-
-    /*// DEBUG: optionally skip to a later stage for testing
-    if (typeof DEBUG_SKIP_TO_STAGE !== 'undefined' && DEBUG_SKIP_TO_STAGE > 1) {
-        // short delay to let glTF loaders and player creation start
-        setTimeout(() => debugSkipTo(DEBUG_SKIP_TO_STAGE), 800);
-    }*/
-
+    stalkerContainer.position.copy(stalkerSpawnPoint);
+    stalkerContainer.visible = true;
     
 
+    if (!stalkerAction.isRunning()) {
+        stalkerAction.play();
+    }
+  
+}
 
 
-function setupEventListeners() {
-    window.addEventListener('keydown', (e) => {
-        keys[e.key.toLowerCase()] = true;
-        if (e.key === "Escape") toggleMenu();
-        if (e.key.toLowerCase() === 'c' && !isTriviaActive && !isMenuOpen) {
-            toggleCameraMode();
+function setupLightingWithShadows() {
+    // 1. Hemisphere Light - for natural outdoor lighting (no shadows)
+    const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x8B4513, 0.6);
+    scene.add(hemisphereLight);
+
+    // 2. Main Directional Light - sun simulation with shadows
+    const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 1.2);
+    directionalLight.position.set(50, 200, 100);
+    directionalLight.castShadow = true;
+    
+    // Enhanced shadow properties
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 2000;
+    directionalLight.shadow.camera.left = -1000;
+    directionalLight.shadow.camera.right = 1000;
+    directionalLight.shadow.camera.top = 1000;
+    directionalLight.shadow.camera.bottom = -1000;
+    directionalLight.shadow.bias = -0.0005;
+    directionalLight.shadow.normalBias = 0.02;
+    directionalLight.shadow.radius = 2;
+    
+    scene.add(directionalLight);
+
+    // 3. Ambient Light - base illumination
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+    scene.add(ambientLight);
+
+    // 4. Strategic Point Lights for key areas (with shadows where needed)
+    createStrategicPointLights();
+
+    // 5. Fill Lights for better overall illumination
+    const fillLight1 = new THREE.DirectionalLight(0x7F7FFF, 0.3);
+    fillLight1.position.set(-100, 50, -100);
+    scene.add(fillLight1);
+
+    const fillLight2 = new THREE.DirectionalLight(0xFF7F7F, 0.2);
+    fillLight2.position.set(100, 30, 100);
+    scene.add(fillLight2);
+
+    // Debug: Uncomment to see shadow camera frustum
+    // const shadowHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
+    // scene.add(shadowHelper);
+}
+
+function setupModelShadows(model) {
+    model.traverse((child) => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            
+            // Improve material properties for better lighting
+            if (child.material) {
+                child.material.roughness = 0.8;
+                child.material.metalness = 0.2;
+            }
         }
     });
-    window.addEventListener('keyup', (e) => {
-        keys[e.key.toLowerCase()] = false;
-    });
-
-    document.addEventListener('mousedown', () => {
-        if (cameraMode === 'firstPerson' && !isPointerLocked && !isTriviaActive && !isMenuOpen) {
-            renderer.domElement.requestPointerLock();
-        }
-    });
-    document.addEventListener('pointerlockchange', () => {
-        isPointerLocked = document.pointerLockElement === renderer.domElement;
-    });
-    document.addEventListener('mousemove', onMouseMove);
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
 }
 
-function onMouseMove(event) {
-    if (cameraMode === 'firstPerson' && isPointerLocked) {
-        const deltaX = event.movementX || 0;
-        const deltaY = event.movementY || 0;
-        firstPersonYaw -= deltaX * 0.002;
-        firstPersonPitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, firstPersonPitch - deltaY * 0.002));
-    }
+function createStrategicPointLights() {
+    // Point lights for street area
+    const streetLight1 = new THREE.PointLight(0xFFEBB0, 0.8, 1000, 2);
+    streetLight1.position.set(-4000, 100, 0);
+    streetLight1.castShadow = true;
+    streetLight1.shadow.mapSize.width = 512;
+    streetLight1.shadow.mapSize.height = 512;
+    streetLight1.shadow.camera.near = 0.5;
+    streetLight1.shadow.camera.far = 1000;
+    scene.add(streetLight1);
+
+    const streetLight2 = new THREE.PointLight(0xFFEBB0, 0.6, 800, 2);
+    streetLight2.position.set(-2000, 80, -1000);
+    streetLight2.castShadow = true;
+    streetLight2.shadow.mapSize.width = 256;
+    streetLight2.shadow.mapSize.height = 256;
+    scene.add(streetLight2);
+
+    // Point lights for warehouse area
+    const warehouseLight1 = new THREE.PointLight(0xFFFFFF, 1.0, 500, 2);
+    warehouseLight1.position.set(500, 50, 0);
+    warehouseLight1.castShadow = true;
+    warehouseLight1.shadow.mapSize.width = 512;
+    warehouseLight1.shadow.mapSize.height = 512;
+    scene.add(warehouseLight1);
+
+    // Point lights for alleyway area
+    const alleyLight1 = new THREE.PointLight(0xB0E0FF, 0.7, 600, 2);
+    alleyLight1.position.set(10000, 60, 0);
+    alleyLight1.castShadow = true;
+    alleyLight1.shadow.mapSize.width = 512;
+    alleyLight1.shadow.mapSize.height = 512;
+    scene.add(alleyLight1);
+
+    const alleyLight2 = new THREE.PointLight(0xB0E0FF, 0.5, 400, 2);
+    alleyLight2.position.set(10100, 40, 500);
+    alleyLight2.castShadow = true;
+    alleyLight2.shadow.mapSize.width = 256;
+    alleyLight2.shadow.mapSize.height = 256;
+    scene.add(alleyLight2);
 }
 
-function toggleCameraMode() {
-    cameraMode = cameraMode === 'thirdPerson' ? 'firstPerson' : 'thirdPerson';
-    if (cameraMode === 'firstPerson') {
-        firstPersonYaw = player.rotation.y;
-        firstPersonPitch = 0;
-        // Hide full player model so the camera shows only the world
-        setPlayerVisibility(false);
-        renderer.domElement.requestPointerLock();
-    } else {
-        // Show player again in third-person
-        setPlayerVisibility(true);
-        document.exitPointerLock();
-    }
-    const instructionsDiv = document.getElementById('instructions-ui');
-    if (instructionsDiv) updateInstructionsUI();
-}
-
-
-function loadPlayer1() {
+function loadPlayer() {
     const loader = new GLTFLoader().setPath('public/running/');
     loader.load('scene.gltf', function(gltf) {
         player = gltf.scene;
         player.scale.set(20, 20, 20);
         player.position.copy(spawnPoint);
         player.rotation.y = Math.PI;
+        
+        // Enable shadows for player model
+        player.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        
         scene.add(player);
+
+        player.add(runningSound);
 
         if (gltf.animations.length > 0) {
             mixer = new THREE.AnimationMixer(player);
@@ -354,107 +473,168 @@ function loadPlayer1() {
             action.paused = true;
         }
         setHeadVisibility(true);
+
+        // snap immediately
+        snapPlayerToGround(true);
+
+        // --- CREATE CIRCULAR PLAYER SHADOW ---
+        const shadowGeo = new THREE.CircleGeometry(12, 32);
+        const shadowMat = new THREE.MeshBasicMaterial({ 
+            color: 0x000000, 
+            transparent: true, 
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        playerShadow = new THREE.Mesh(shadowGeo, shadowMat);
+        playerShadow.rotation.x = -Math.PI / 2;
+        playerShadow.receiveShadow = false; // This is just a visual effect, not a real shadow
+        scene.add(playerShadow);
+
     });
 }
 
-
-function createCheckpoints(data) {
+function createCheckpoints() {
     checkpoints = [];
     keysCollected = 0; 
     updateKeyCounter();
 
     // Select correct question pool
     let questionPool;
-    let positions;
+    let possiblePositions; // Array of possible positions for each stage
+    
     if(stage === 1){
         questionPool = easyQuestions;
-        positions = [
-            new THREE.Vector3(-3943,35,-3032),
-            new THREE.Vector3(-4193,35,-1446),
-            new THREE.Vector3(-5679,35,-92)
+        // Multiple possible positions in street area
+        possiblePositions = [
+            new THREE.Vector3(-1849, 35, 1610),
+            new THREE.Vector3(1957, 35, -738),
+            new THREE.Vector3(-2033, 35, -3042),
+            new THREE.Vector3(-5561, 35, 1526),
+            new THREE.Vector3(-6178, 35, -749),
+            new THREE.Vector3(-6075, 35, 3882),
+            new THREE.Vector3(-4178, 35, -4055),
+            new THREE.Vector3(-4163, 35, -3094),
+            new THREE.Vector3(-4940, 35, -2467),
+            new THREE.Vector3(-4167, 35, 1672),
+            new THREE.Vector3(-3943,35,-3032), new THREE.Vector3(-4193,35,-1446), new THREE.Vector3(-5679,35,-92),
+            new THREE.Vector3(-3500,35,-2500), new THREE.Vector3(-4500,35,-1800), new THREE.Vector3(-5200,35,-800),
+            new THREE.Vector3(-3800,35,-3200), new THREE.Vector3(-4800,35,-2200), new THREE.Vector3(-5500,35,-500),
+            new THREE.Vector3(-3200,35,-2800), new THREE.Vector3(-4400,35,-1200), new THREE.Vector3(-5800,35,-200)
         ];
     } else if(stage === 2){
         questionPool = mediumQuestions;
-        positions = [
-            new THREE.Vector3(300,35,2000),
-            new THREE.Vector3(668,35,1000),
-            new THREE.Vector3(632,35,-222)
+        // Multiple possible positions in warehouse area
+        possiblePositions = [
+            new THREE.Vector3(84, 35, -862),
+            new THREE.Vector3(988, 35, -937),
+            new THREE.Vector3(863, 35, 256),
+            new THREE.Vector3(815, 35, 943),
+            new THREE.Vector3(256, 35, 1893),
+            new THREE.Vector3(923, 35, 2582),
+            new THREE.Vector3(299, 35, -318),
+            new THREE.Vector3(508, 35, 812),
+            new THREE.Vector3(138, 35, 1484),
+            new THREE.Vector3(133, 35, 29597),
+            new THREE.Vector3(300,35,2000), new THREE.Vector3(668,35,1000), new THREE.Vector3(632,35,-222),
+            new THREE.Vector3(500,35,1800), new THREE.Vector3(800,35,800), new THREE.Vector3(400,35,0),
+            new THREE.Vector3(200,35,1500), new THREE.Vector3(900,35,1200), new THREE.Vector3(600,35,-500),
+            new THREE.Vector3(100,35,2200), new THREE.Vector3(750,35,600), new THREE.Vector3(300,35,-300)
         ];
     } else {
         questionPool = hardQuestions;
-        positions = [
-            new THREE.Vector3(10100, 35, 1000),
-            new THREE.Vector3(10000, 35, 2000),
-            new THREE.Vector3(10000, 35, 200)
+        // Multiple possible positions in alleyway area
+        possiblePositions = [
+            new THREE.Vector3(10065, 35, 983),
+            new THREE.Vector3(9917, 35, 1688),
+            new THREE.Vector3(9832, 35, 2097),
+            new THREE.Vector3(9945, 35, 476),
+            new THREE.Vector3(10284, 35, 130),
+            new THREE.Vector3(10795, 35, 221),
+            new THREE.Vector3(10917, 35, 344),
+            new THREE.Vector3(9907, 35, 1651),
+            new THREE.Vector3(9806, 35, 2146),
+            new THREE.Vector3(10076, 35, 170),
+            new THREE.Vector3(10101, 35, 1634),
+            new THREE.Vector3(9443, 35, 1922),
+            new THREE.Vector3(10100,35,1000), new THREE.Vector3(10000,35,2000), new THREE.Vector3(10000,35,200),
+            new THREE.Vector3(10200,35,800), new THREE.Vector3(9900,35,1800), new THREE.Vector3(10150,35,0),
+            new THREE.Vector3(10300,35,1200), new THREE.Vector3(9800,35,2200), new THREE.Vector3(10050,35,-200),
+            new THREE.Vector3(10400,35,1500), new THREE.Vector3(9700,35,1600), new THREE.Vector3(9950,35,400)
         ];
     }
 
     // Pick 3 random unique questions
-    const selected = [];
-    while(selected.length < 3){
+    const selectedQuestions = [];
+    while(selectedQuestions.length < 3){
         const rand = questionPool[Math.floor(Math.random() * questionPool.length)];
-        if(!selected.includes(rand)) selected.push(rand);
+        if(!selectedQuestions.includes(rand)) selectedQuestions.push(rand);
     }
 
-    // Create spheres
-    for(let i=0; i<3; i++){
-        // --- Vibrant Glowy Sphere ---
+    // Pick 3 random unique positions
+    const selectedPositions = [];
+    const shuffledPositions = [...possiblePositions].sort(() => 0.5 - Math.random());
+    
+    for(let i = 0; i < 3; i++){
+        selectedPositions.push(shuffledPositions[i]);
+    }
+
+    // Create spheres at random positions
+    for(let i = 0; i < 3; i++){
         const geometry = new THREE.SphereGeometry(3, 32, 32);
         const material = new THREE.MeshStandardMaterial({
-            color: 0xffff00,          // bright yellow
-            emissive: 0xffcc00,       // makes it glow
+            color: 0xffff00,
+            emissive: 0xffcc00,
             emissiveIntensity: 1.5,
             metalness: 0.3,
             roughness: 0.2
         });
         const sphere = new THREE.Mesh(geometry, material);
-        sphere.position.copy(positions[i]);
-        sphere.trivia = selected[i];
+        sphere.position.copy(selectedPositions[i]);
+        sphere.trivia = selectedQuestions[i];
 
-        sphere.baseY = positions[i].y;
+        sphere.baseY = selectedPositions[i].y;
 
         scene.add(sphere);
         checkpoints.push(sphere);
 
-        // --- Add a glowing light source for extra effect ---
-        const glow = new THREE.PointLight(0xffdd33, 1.2, 50); // soft golden glow
-        glow.position.copy(positions[i]);
+        // Add glowing light
+        const glow = new THREE.PointLight(0xffdd33, 1.2, 50);
+        glow.position.copy(selectedPositions[i]);
         scene.add(glow);
 
-                    // --- Circular Shadow under sphere ---
-            const shadowGeo = new THREE.CircleGeometry(6, 32);
-            const shadowMat = new THREE.MeshBasicMaterial({
-                color: 0x000000,
-                transparent: true,
-                opacity: 0.4,
-                side: THREE.DoubleSide
-            });
-            const shadow = new THREE.Mesh(shadowGeo, shadowMat);
-            shadow.rotation.x = -Math.PI / 2; // flat on ground
+        // Add circular shadow
+        const shadowGeo = new THREE.CircleGeometry(6, 32);
+        const shadowMat = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.DoubleSide
+        });
+        const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+        shadow.rotation.x = -Math.PI / 2;
 
-            // Raycast downward to find the ground under the sphere
-            const raycaster = new THREE.Raycaster();
-            const down = new THREE.Vector3(0, -1, 0);
-            raycaster.set(new THREE.Vector3(positions[i].x, positions[i].y + 100, positions[i].z), down);
-            const intersects = raycaster.intersectObjects(collisionObjects, true);
+        // Position shadow on ground
+        const raycaster = new THREE.Raycaster();
+        const down = new THREE.Vector3(0, -1, 0);
+        raycaster.set(new THREE.Vector3(selectedPositions[i].x, selectedPositions[i].y + 100, selectedPositions[i].z), down);
+        const intersects = raycaster.intersectObjects(collisionObjects, true);
 
-            if (intersects.length > 0) {
-                shadow.position.copy(intersects[0].point);
-                shadow.position.y += 0.05; // lift slightly to avoid z-fighting
-            } else {
-                // fallback: just put shadow at y = 0
-                shadow.position.set(positions[i].x, 0.05, positions[i].z);
-            }
+        if (intersects.length > 0) {
+            shadow.position.copy(intersects[0].point);
+            shadow.position.y += 0.05;
+        } else {
+            shadow.position.set(selectedPositions[i].x, 0.05, selectedPositions[i].z);
+        }
 
-            scene.add(shadow);
-
-            // Link shadow to sphere
-            sphere.shadowCircle = shadow;
-
+        scene.add(shadow);
+        sphere.shadowCircle = shadow;
     }
+    
+    
 }
 
 
+// [All other existing functions remain unchanged...]
 function showTrivia(sphere){
     // Pause gameplay and show trivia UI
     isTriviaActive = true;
@@ -523,52 +703,13 @@ function snapPlayerToGround(force = false) {
     }
 }
 
-function loadPlayer() {
-    const loader = new GLTFLoader().setPath('public/running/');
-    loader.load('scene.gltf', function(gltf) {
-        player = gltf.scene;
-        player.scale.set(20, 20, 20);
-        player.position.copy(spawnPoint);
-        player.rotation.y = Math.PI;
-        scene.add(player);
-
-        player.add(runningSound);
-
-
-        if (gltf.animations.length > 0) {
-            mixer = new THREE.AnimationMixer(player);
-            action = mixer.clipAction(gltf.animations[0]);
-            action.play();
-            action.paused = true;
-        }
-        setHeadVisibility(true);
-
-        // snap immediately
-        snapPlayerToGround(true);
-
-        /*// --- CREATE CIRCULAR SHADOW ---
-        const shadowGeo = new THREE.CircleGeometry(10, 32); // radius 10, smoothness 32 segments
-        const shadowMat = new THREE.MeshBasicMaterial({ 
-            color: 0x000000, 
-            transparent: true, 
-            opacity: 0.4, 
-            side: THREE.DoubleSide // makes it visible from both sides
-        });
-        playerShadow = new THREE.Mesh(shadowGeo, shadowMat);
-        playerShadow.rotation.x = -Math.PI / 2; // lay flat
-        playerShadow.position.y = 0.1; // slightly above ground
-        scene.add(playerShadow);
-        */
-
-    });
-}
-
 function enterWarehouse() {
     stage = 2;
     player.scale.set(20, 20, 20);
     player.position.set(515, 0, -87); // spawn slightly above floor
     snapPlayerToGround(true);
     createCheckpoints();
+    spawnStalker(); // --- ADDED: Respawn stalker for the new stage
     clearInterval(timerInterval);
     totalTime = 120;
     remainingTime = totalTime;
@@ -582,56 +723,13 @@ function enterApartment() {
     player.position.set(10000, 0, 1000);
     snapPlayerToGround(true);
     createCheckpoints();
+    spawnStalker(); // --- ADDED: Respawn stalker for the new stage
     clearInterval(timerInterval);
     totalTime = 60;
     remainingTime = totalTime;
     startTimer();
     alert("Final Stage: The Alleyway! Collect 3 keys!"); // <<< RENAMED
 }
-
-/*function debugSkipTo(stageNum){
-    if(!player){
-        // if player isn't loaded yet, try again shortly
-        setTimeout(() => debugSkipTo(stageNum), 250);
-        return;
-    }
-
-    if(stageNum === 2){
-        stage = 2;
-        // Move player to the warehouse spawn used in enterWarehouse
-        player.position.set(515, 0, -87);
-        player.scale.set(20,20,20);
-        snapPlayerToGround(true);
-
-        // Build checkpoints for stage 2
-        createCheckpoints(); // createCheckpoints reads `stage` and picks mediumQuestions & positions
-        clearInterval(timerInterval);
-        totalTime = 120;
-        remainingTime = totalTime;
-        startTimer();
-
-        isTriviaActive = false;
-        isMenuOpen = false;
-        alert("DEBUG: Skipped to Warehouse (Stage 2)");
-    }
-    else if(stageNum === 3){
-        stage = 3;
-        player.position.set(10000, 0, 1000);
-        player.scale.set(20,20,20);
-        snapPlayerToGround(true);
-
-        // Build checkpoints for stage 3
-        createCheckpoints();
-        clearInterval(timerInterval);
-        totalTime = 60;
-        remainingTime = totalTime;
-        startTimer();
-
-        isTriviaActive = false;
-        isMenuOpen = false;
-        alert("DEBUG: Skipped to Apartment (Stage 3)");
-    }
-}*/
 
 
 // (Win/Lose, Timer, Loading Screen, and Menu functions remain unchanged)
@@ -640,14 +738,14 @@ function finalWin() {
     if (victorySound.isPlaying) victorySound.stop();
     victorySound.play();
 
-    isTriviaActive = true; clearInterval(timerInterval); isTimerRunning = false;
-    const winDiv = document.createElement('div'); winDiv.id = 'winDiv';
+    isTriviaActive = true; clearInterval(timerInterval); isTimerRunning = false;
+    const winDiv = document.createElement('div'); winDiv.id = 'winDiv';
     // (Styles are unchanged)
-    winDiv.style.position = 'absolute'; winDiv.style.top = '50%'; winDiv.style.left = '50%'; winDiv.style.transform = 'translate(-50%, -50%)'; winDiv.style.padding = '20px'; winDiv.style.backgroundColor = 'rgba(0,0,0,0.9)'; winDiv.style.color = 'white'; winDiv.style.fontFamily = 'Arial'; winDiv.style.fontSize = '24px'; winDiv.style.textAlign = 'center'; winDiv.style.borderRadius = '10px'; winDiv.style.zIndex = '300';
-    winDiv.innerHTML = "<p>Congratulations! You completed all stages!</p>";
-    const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.onclick = () => location.reload();
-    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
-    const creditsBtn = document.createElement('button');
+    winDiv.style.position = 'absolute'; winDiv.style.top = '50%'; winDiv.style.left = '50%'; winDiv.style.transform = 'translate(-50%, -50%)'; winDiv.style.padding = '20px'; winDiv.style.backgroundColor = 'rgba(0,0,0,0.9)'; winDiv.style.color = 'white'; winDiv.style.fontFamily = 'Arial'; winDiv.style.fontSize = '24px'; winDiv.style.textAlign = 'center'; winDiv.style.borderRadius = '10px'; winDiv.style.zIndex = '300';
+    winDiv.innerHTML = "<p>Congratulations! You completed all stages!</p>";
+    const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.onclick = () => location.reload();
+    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
+    const creditsBtn = document.createElement('button');
     creditsBtn.innerText = 'View Credits';
     creditsBtn.style.margin = '10px';
     creditsBtn.style.padding = '10px 20px';
@@ -722,34 +820,34 @@ function handleDeath() {
     if (deathSound.isPlaying) deathSound.stop();
     deathSound.play();
 
-    isTriviaActive = true;
-    const deathDiv = document.createElement('div');
+    isTriviaActive = true;
+    const deathDiv = document.createElement('div');
     // (Styles are unchanged)
-    deathDiv.style.position = 'absolute'; deathDiv.style.top = '50%'; deathDiv.style.left = '50%'; deathDiv.style.transform = 'translate(-50%, -50%)'; deathDiv.style.padding = '20px'; deathDiv.style.backgroundColor = 'rgba(0,0,0,0.9)'; deathDiv.style.color = 'white'; deathDiv.style.fontFamily = 'Arial'; deathDiv.style.fontSize = '24px'; deathDiv.style.textAlign = 'center'; deathDiv.style.borderRadius = '10px'; deathDiv.style.zIndex = '300';
-    deathDiv.innerHTML = "<p>You have died!</p>";
-    const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.onclick = () => location.reload();
-    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
-    deathDiv.appendChild(restartBtn); deathDiv.appendChild(quitBtn); document.body.appendChild(deathDiv);
+    deathDiv.style.position = 'absolute'; deathDiv.style.top = '50%'; deathDiv.style.left = '50%'; deathDiv.style.transform = 'translate(-50%, -50%)'; deathDiv.style.padding = '20px'; deathDiv.style.backgroundColor = 'rgba(0,0,0,0.9)'; deathDiv.style.color = 'white'; deathDiv.style.fontFamily = 'Arial'; deathDiv.style.fontSize = '24px'; deathDiv.style.textAlign = 'center'; deathDiv.style.borderRadius = '10px'; deathDiv.style.zIndex = '300';
+    deathDiv.innerHTML = "<p>You have died!</p>";
+    const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.onclick = () => location.reload();
+    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
+    deathDiv.appendChild(restartBtn); deathDiv.appendChild(quitBtn); document.body.appendChild(deathDiv);
 }
 // --- Timer ---
 function createTimer() {
-    timerDiv = document.createElement('div');
+    timerDiv = document.createElement('div');
     // (Styles are unchanged)
-    timerDiv.style.position = 'absolute'; timerDiv.style.top = '10px'; timerDiv.style.right = '10px'; timerDiv.style.padding = '10px 15px'; timerDiv.style.backgroundColor = 'rgba(0,0,0,0.7)'; timerDiv.style.color = 'white'; timerDiv.style.fontFamily = 'Arial'; timerDiv.style.fontSize = '16px'; timerDiv.style.borderRadius = '5px'; timerDiv.style.zIndex = '100';
-    document.body.appendChild(timerDiv); updateTimerDisplay();
+    timerDiv.style.position = 'absolute'; timerDiv.style.top = '10px'; timerDiv.style.right = '10px'; timerDiv.style.padding = '10px 15px'; timerDiv.style.backgroundColor = 'rgba(0,0,0,0.7)'; timerDiv.style.color = 'white'; timerDiv.style.fontFamily = 'Arial'; timerDiv.style.fontSize = '16px'; timerDiv.style.borderRadius = '5px'; timerDiv.style.zIndex = '100';
+    document.body.appendChild(timerDiv); updateTimerDisplay();
 }
 function startTimer() {
-    clearInterval(timerInterval); remainingTime = totalTime; isTimerRunning = true; updateTimerDisplay();
-    timerInterval = setInterval(() => {
-        if (!isTimerRunning) return;
-        remainingTime--; updateTimerDisplay();
-        if (remainingTime <= 0) { clearInterval(timerInterval); isTimerRunning = false; handleDeath(); }
-    }, 1000);
+    clearInterval(timerInterval); remainingTime = totalTime; isTimerRunning = true; updateTimerDisplay();
+    timerInterval = setInterval(() => {
+        if (!isTimerRunning) return;
+        remainingTime--; updateTimerDisplay();
+        if (remainingTime <= 0) { clearInterval(timerInterval); isTimerRunning = false; handleDeath(); }
+    }, 1000);
 }
 function updateTimerDisplay() {
-    const minutes = Math.floor(remainingTime / 60);
-    const seconds = remainingTime % 60;
-    timerDiv.innerText = `Time: ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    const minutes = Math.floor(remainingTime / 60);
+    const seconds = remainingTime % 60;
+    timerDiv.innerText = `Time: ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
 }
 
 // <<< RENAMED: Key Counter functions
@@ -761,11 +859,11 @@ function updateKeyCounter() {
 
 // --- Loading Screen ---
 function createLoadingScreen() {
-    loadingScreenDiv = document.createElement('div');
+    loadingScreenDiv = document.createElement('div');
     // (Styles are unchanged)
-    loadingScreenDiv.style.position = 'absolute'; loadingScreenDiv.style.top = '0'; loadingScreenDiv.style.left = '0'; loadingScreenDiv.style.width = '100%'; loadingScreenDiv.style.height = '100%'; loadingScreenDiv.style.backgroundColor = 'black'; loadingScreenDiv.style.color = 'white'; loadingScreenDiv.style.display = 'flex'; loadingScreenDiv.style.justifyContent = 'center'; loadingScreenDiv.style.alignItems = 'center'; loadingScreenDiv.style.zIndex = '999'; loadingScreenDiv.style.fontSize = '3em';
-    loadingScreenDiv.innerText = 'Loading...';
-    document.body.appendChild(loadingScreenDiv);
+    loadingScreenDiv.style.position = 'absolute'; loadingScreenDiv.style.top = '0'; loadingScreenDiv.style.left = '0'; loadingScreenDiv.style.width = '100%'; loadingScreenDiv.style.height = '100%'; loadingScreenDiv.style.backgroundColor = 'black'; loadingScreenDiv.style.color = 'white'; loadingScreenDiv.style.display = 'flex'; loadingScreenDiv.style.justifyContent = 'center'; loadingScreenDiv.style.alignItems = 'center'; loadingScreenDiv.style.zIndex = '999'; loadingScreenDiv.style.fontSize = '3em';
+    loadingScreenDiv.innerText = 'Loading...';
+    document.body.appendChild(loadingScreenDiv);
 }
 function showLoadingScreen() { loadingScreenDiv.style.display = 'flex';}
 function hideLoadingScreen() { loadingScreenDiv.style.display = 'none';}
@@ -802,23 +900,23 @@ function updateInstructionsUI() {
 
 function createMenu() {
 // (Menu creation is unchanged)
-    menuDiv = document.createElement('div');
+    menuDiv = document.createElement('div');
     // (Styles are unchanged)
-    menuDiv.style.position = 'absolute'; menuDiv.style.top = '50%'; menuDiv.style.left = '50%'; menuDiv.style.transform = 'translate(-50%, -50%)'; menuDiv.style.padding = '30px'; menuDiv.style.backgroundColor = 'rgba(0,0,0,0.9)'; menuDiv.style.color = 'white'; menuDiv.style.fontFamily = 'Arial'; menuDiv.style.fontSize = '18px'; menuDiv.style.textAlign = 'center'; menuDiv.style.borderRadius = '15px'; menuDiv.style.display = 'none'; menuDiv.style.zIndex = '200';
-    const title = document.createElement('h2'); title.innerText = 'GAME PAUSED'; title.style.margin = '0 0 20px 0';
-    const controls = document.createElement('div'); controls.style.textAlign = 'left'; controls.style.margin = '20px 0'; controls.style.fontSize = '16px';
-    controls.innerHTML = `<h3>Controls:</h3><p><strong>W, A, S, D</strong> - Move</p><p><strong>Mouse</strong> - Look around</p><p><strong>Shift</strong> - Sprint</p><p><strong>Space</strong> - Jump</p><p><strong>ESC</strong> - Toggle this menu</p><p><strong>C</strong> - Toggle Camera</p>`;
-    const buttonContainer = document.createElement('div'); buttonContainer.style.marginTop = '20px';
-    const resumeBtn = document.createElement('button'); resumeBtn.innerText = 'Resume'; resumeBtn.style.margin = '10px'; resumeBtn.style.padding = '10px 20px'; resumeBtn.style.fontSize = '16px'; resumeBtn.style.borderRadius = '5px'; resumeBtn.style.border = 'none'; resumeBtn.style.backgroundColor = '#4CAF50'; resumeBtn.style.color = 'white'; resumeBtn.style.cursor = 'pointer'; resumeBtn.onclick = () => toggleMenu();
-    const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.style.fontSize = '16px'; restartBtn.style.borderRadius = '5px'; restartBtn.style.border = 'none'; restartBtn.style.backgroundColor = '#f44336'; restartBtn.style.color = 'white'; restartBtn.style.cursor = 'pointer'; restartBtn.onclick = () => location.reload();
-    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.style.fontSize = '16px'; quitBtn.style.borderRadius = '5px'; quitBtn.style.border = 'none'; quitBtn.style.backgroundColor = '#555'; quitBtn.style.color = 'white'; quitBtn.style.cursor = 'pointer'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
-    buttonContainer.appendChild(resumeBtn); buttonContainer.appendChild(restartBtn); buttonContainer.appendChild(quitBtn);
-    menuDiv.appendChild(title); menuDiv.appendChild(controls); menuDiv.appendChild(buttonContainer); document.body.appendChild(menuDiv);
+    menuDiv.style.position = 'absolute'; menuDiv.style.top = '50%'; menuDiv.style.left = '50%'; menuDiv.style.transform = 'translate(-50%, -50%)'; menuDiv.style.padding = '30px'; menuDiv.style.backgroundColor = 'rgba(0,0,0,0.9)'; menuDiv.style.color = 'white'; menuDiv.style.fontFamily = 'Arial'; menuDiv.style.fontSize = '18px'; menuDiv.style.textAlign = 'center'; menuDiv.style.borderRadius = '15px'; menuDiv.style.display = 'none'; menuDiv.style.zIndex = '200';
+    const title = document.createElement('h2'); title.innerText = 'GAME PAUSED'; title.style.margin = '0 0 20px 0';
+    const controls = document.createElement('div'); controls.style.textAlign = 'left'; controls.style.margin = '20px 0'; controls.style.fontSize = '16px';
+    controls.innerHTML = `<h3>Controls:</h3><p><strong>W, A, S, D</strong> - Move</p><p><strong>Mouse</strong> - Look around</p><p><strong>Shift</strong> - Sprint</p><p><strong>Space</strong> - Jump</p><p><strong>ESC</strong> - Toggle this menu</p><p><strong>C</strong> - Toggle Camera</p>`;
+    const buttonContainer = document.createElement('div'); buttonContainer.style.marginTop = '20px';
+    const resumeBtn = document.createElement('button'); resumeBtn.innerText = 'Resume'; resumeBtn.style.margin = '10px'; resumeBtn.style.padding = '10px 20px'; resumeBtn.style.fontSize = '16px'; resumeBtn.style.borderRadius = '5px'; resumeBtn.style.border = 'none'; resumeBtn.style.backgroundColor = '#4CAF50'; resumeBtn.style.color = 'white'; resumeBtn.style.cursor = 'pointer'; resumeBtn.onclick = () => toggleMenu();
+    const restartBtn = document.createElement('button'); restartBtn.innerText = 'Restart'; restartBtn.style.margin = '10px'; restartBtn.style.padding = '10px 20px'; restartBtn.style.fontSize = '16px'; restartBtn.style.borderRadius = '5px'; restartBtn.style.border = 'none'; restartBtn.style.backgroundColor = '#f44336'; restartBtn.style.color = 'white'; restartBtn.style.cursor = 'pointer'; restartBtn.onclick = () => location.reload();
+    const quitBtn = document.createElement('button'); quitBtn.innerText = 'Quit'; quitBtn.style.margin = '10px'; quitBtn.style.padding = '10px 20px'; quitBtn.style.fontSize = '16px'; quitBtn.style.borderRadius = '5px'; quitBtn.style.border = 'none'; quitBtn.style.backgroundColor = '#555'; quitBtn.style.color = 'white'; quitBtn.style.cursor = 'pointer'; quitBtn.onclick = () => window.location.href = 'https://www.google.com';
+    buttonContainer.appendChild(resumeBtn); buttonContainer.appendChild(restartBtn); buttonContainer.appendChild(quitBtn);
+    menuDiv.appendChild(title); menuDiv.appendChild(controls); menuDiv.appendChild(buttonContainer); document.body.appendChild(menuDiv);
 }
 function toggleMenu(forceState = null) {
-    if (forceState !== null) isMenuOpen = forceState; else isMenuOpen = !isMenuOpen;
-    menuDiv.style.display = isMenuOpen ? 'block' : 'none'; isTriviaActive = isMenuOpen;
-    if (isPointerLocked && isMenuOpen) { document.exitPointerLock();}
+    if (forceState !== null) isMenuOpen = forceState; else isMenuOpen = !isMenuOpen;
+    menuDiv.style.display = isMenuOpen ? 'block' : 'none'; isTriviaActive = isMenuOpen;
+    if (isPointerLocked && isMenuOpen) { document.exitPointerLock();}
 }
 
 
@@ -846,7 +944,7 @@ function updatePlayer(delta) {
         player.rotation.y = THREE.MathUtils.lerp(player.rotation.y, targetRotation, 0.15);
 
         const speed = playerBaseSpeed * (keys['shift'] ? sprintMultiplier : 1.0);
-        if (action) action.timeScale = keys['shift'] ? sprintMultiplier : 1.0;
+        if (action) action.timeScale = keys['shift'] ? sprintMultiplier : 1.25;
 
         const moveVector = moveDirection.multiplyScalar(speed * delta);
 
@@ -898,6 +996,7 @@ function updatePlayer(delta) {
     } else {
         isGrounded = false;
     }
+
 }
 
 function updateCamera(delta) {
@@ -926,7 +1025,7 @@ function updateCamera(delta) {
     } else { // First Person
         controls.enabled = false;
         player.rotation.y = firstPersonYaw;
-        const eyeHeight = playerHeight * 0.9;
+        const eyeHeight = playerHeight * 2;
         const headPos = player.position.clone().add(new THREE.Vector3(0, eyeHeight, 0));
         
         // Position camera at the head position (player's eye level)
@@ -945,6 +1044,97 @@ function updateCamera(delta) {
     }
 }
 
+function setupEventListeners() {
+    window.addEventListener('keydown', (e) => {
+        keys[e.key.toLowerCase()] = true;
+        if (e.key === "Escape") toggleMenu();
+        if (e.key.toLowerCase() === 'c' && !isTriviaActive && !isMenuOpen) {
+            toggleCameraMode();
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        keys[e.key.toLowerCase()] = false;
+    });
+
+    document.addEventListener('mousedown', () => {
+        if (cameraMode === 'firstPerson' && !isPointerLocked && !isTriviaActive && !isMenuOpen) {
+            renderer.domElement.requestPointerLock();
+        }
+    });
+    document.addEventListener('pointerlockchange', () => {
+        isPointerLocked = document.pointerLockElement === renderer.domElement;
+    });
+    document.addEventListener('mousemove', onMouseMove);
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+}
+
+function onMouseMove(event) {
+    if (cameraMode === 'firstPerson' && isPointerLocked) {
+        const deltaX = event.movementX || 0;
+        const deltaY = event.movementY || 0;
+        firstPersonYaw -= deltaX * 0.002;
+        firstPersonPitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, firstPersonPitch - deltaY * 0.002));
+    }
+}
+
+function toggleCameraMode() {
+    cameraMode = cameraMode === 'thirdPerson' ? 'firstPerson' : 'thirdPerson';
+    if (cameraMode === 'firstPerson') {
+        firstPersonYaw = player.rotation.y;
+        firstPersonPitch = 0;
+        setPlayerVisibility(false);
+        renderer.domElement.requestPointerLock();
+    } else {
+        setPlayerVisibility(true);
+        document.exitPointerLock();
+    }
+    const instructionsDiv = document.getElementById('instructions-ui');
+    if (instructionsDiv) updateInstructionsUI();
+}
+
+
+// --- ADDED: Function to update stalker's movement and behavior ---
+function updateStalker(delta) {
+    // --- MODIFIED: Check for the container's existence and visibility ---
+    if (!stalkerContainer || !player || !stalkerContainer.visible || isTriviaActive || isMenuOpen) {
+        return;
+    }
+
+    // --- 1. Movement towards player (using the container's position) ---
+    const direction = new THREE.Vector3().subVectors(player.position, stalkerContainer.position);
+    direction.y = 0;
+    direction.normalize();
+
+    stalkerContainer.position.add(direction.clone().multiplyScalar(stalkerSpeed * delta));
+    
+    // --- 2. Snap to ground ---
+    const stalkerRaycaster = new THREE.Raycaster();
+    const stalkerOrigin = stalkerContainer.position.clone().add(new THREE.Vector3(0, 100, 0));
+    stalkerRaycaster.set(stalkerOrigin, new THREE.Vector3(0, -1, 0));
+    const stalkerGroundIntersects = stalkerRaycaster.intersectObjects(collisionObjects, true);
+    if (stalkerGroundIntersects.length > 0) {
+        stalkerContainer.position.y = stalkerGroundIntersects[0].point.y;
+    }
+
+    // --- 3. Look at player (rotate the container) ---
+    const lookAtTarget = new THREE.Vector3(player.position.x, stalkerContainer.position.y, player.position.z);
+    stalkerContainer.lookAt(lookAtTarget);
+
+    // --- 4. Animation (this still updates the model inside the container) ---
+    if (stalkerMixer) {
+        stalkerMixer.update(delta);
+    }
+
+    // --- 5. Collision detection (using the container's position) ---
+    if (player.position.distanceTo(stalkerContainer.position) < stalkerCollisionDistance) {
+        handleDeath();
+    }
+}
 
 function animate() {
     requestAnimationFrame(animate);
@@ -952,19 +1142,34 @@ function animate() {
     if (mixer) mixer.update(delta);
 
     updatePlayer(delta);
+    updateStalker(delta); // Call the stalker update function
     updateCamera(delta);
     
+    // Update player shadow position
+    if (playerShadow && player) {
+        const shadowRaycaster = new THREE.Raycaster();
+        shadowRaycaster.set(player.position.clone().add(new THREE.Vector3(0, 100, 0)), new THREE.Vector3(0, -1, 0));
+        const shadowIntersects = shadowRaycaster.intersectObjects(collisionObjects, true);
+        
+        if (shadowIntersects.length > 0) {
+            playerShadow.position.copy(shadowIntersects[0].point);
+            playerShadow.position.y += 0.1;
+            
+            // Scale shadow based on player height
+            const shadowScale = Math.max(0.5, 1 - (player.position.y - shadowIntersects[0].point.y) / 100);
+            playerShadow.scale.setScalar(shadowScale);
+        }
+    }
 
-            // Make spheres pulse
-        const time = Date.now() * 0.003; // slow pulse
-        checkpoints.forEach((sphere, index) => {
-            if (sphere.material && sphere.material.emissive) {
-                // Pulse between 0.5 and 2.0
-                const intensity = 1 + Math.sin(time + index) * 0.5;
-                sphere.material.emissiveIntensity = intensity;
-            }
-        sphere.position.y = sphere.baseY + Math.sin(time + index) * 2; // amplitude = 2
-        });
+    // Make spheres pulse
+    const time = Date.now() * 0.003;
+    checkpoints.forEach((sphere, index) => {
+        if (sphere.material && sphere.material.emissive) {
+            const intensity = 1 + Math.sin(time + index) * 0.5;
+            sphere.material.emissiveIntensity = intensity;
+        }
+        sphere.position.y = sphere.baseY + Math.sin(time + index) * 2;
+    });
 
     // safety net – snap every 2s
     idleTimer += delta;
@@ -978,8 +1183,6 @@ function animate() {
             showTrivia(cp);
         }
     });
-
-    
 
     renderer.render(scene, camera);
 }
