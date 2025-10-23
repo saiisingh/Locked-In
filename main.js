@@ -358,7 +358,7 @@ function loadPlayer1() {
 }
 
 
-function createCheckpoints(data) {
+/*function createCheckpoints(data) {
     checkpoints = [];
     keysCollected = 0; 
     updateKeyCounter();
@@ -452,6 +452,145 @@ function createCheckpoints(data) {
             sphere.shadowCircle = shadow;
 
     }
+}*/
+function createCheckpoints() {
+    checkpoints = [];
+    keysCollected = 0; 
+    updateKeyCounter();
+
+    // Select correct question pool
+    let questionPool;
+    let possiblePositions; // Array of possible positions for each stage
+    
+    if(stage === 1){
+        questionPool = easyQuestions;
+        // Multiple possible positions in street area
+        possiblePositions = [
+            new THREE.Vector3(-1849, 35, 1610),
+            new THREE.Vector3(1957, 35, -738),
+            new THREE.Vector3(-2033, 35, -3042),
+            new THREE.Vector3(-5561, 35, 1526),
+            new THREE.Vector3(-6178, 35, -749),
+            new THREE.Vector3(-6075, 35, 3882),
+            new THREE.Vector3(-4178, 35, -4055),
+            new THREE.Vector3(-4163, 35, -3094),
+            new THREE.Vector3(-4940, 35, -2467),
+            new THREE.Vector3(-4167, 35, 1672),
+            new THREE.Vector3(-3943,35,-3032), new THREE.Vector3(-4193,35,-1446), new THREE.Vector3(-5679,35,-92),
+            new THREE.Vector3(-3500,35,-2500), new THREE.Vector3(-4500,35,-1800), new THREE.Vector3(-5200,35,-800),
+            new THREE.Vector3(-3800,35,-3200), new THREE.Vector3(-4800,35,-2200), new THREE.Vector3(-5500,35,-500),
+            new THREE.Vector3(-3200,35,-2800), new THREE.Vector3(-4400,35,-1200), new THREE.Vector3(-5800,35,-200)
+        ];
+    } else if(stage === 2){
+        questionPool = mediumQuestions;
+        // Multiple possible positions in warehouse area
+        possiblePositions = [
+            new THREE.Vector3(84, 35, -862),
+            new THREE.Vector3(988, 35, -937),
+            new THREE.Vector3(863, 35, 256),
+            new THREE.Vector3(815, 35, 943),
+            new THREE.Vector3(256, 35, 1893),
+            new THREE.Vector3(923, 35, 2582),
+            new THREE.Vector3(299, 35, -318),
+            new THREE.Vector3(508, 35, 812),
+            new THREE.Vector3(138, 35, 1484),
+            new THREE.Vector3(133, 35, 29597),
+            new THREE.Vector3(300,35,2000), new THREE.Vector3(668,35,1000), new THREE.Vector3(632,35,-222),
+            new THREE.Vector3(500,35,1800), new THREE.Vector3(800,35,800), new THREE.Vector3(400,35,0),
+            new THREE.Vector3(200,35,1500), new THREE.Vector3(900,35,1200), new THREE.Vector3(600,35,-500),
+            new THREE.Vector3(100,35,2200), new THREE.Vector3(750,35,600), new THREE.Vector3(300,35,-300)
+        ];
+    } else {
+        questionPool = hardQuestions;
+        // Multiple possible positions in alleyway area
+        possiblePositions = [
+            new THREE.Vector3(10065, 35, 983),
+            new THREE.Vector3(9917, 35, 1688),
+            new THREE.Vector3(9832, 35, 2097),
+            new THREE.Vector3(9945, 35, 476),
+            new THREE.Vector3(10284, 35, 130),
+            new THREE.Vector3(10795, 35, 221),
+            new THREE.Vector3(10917, 35, 344),
+            new THREE.Vector3(9907, 35, 1651),
+            new THREE.Vector3(9806, 35, 2146),
+            new THREE.Vector3(10076, 35, 170),
+            new THREE.Vector3(10101, 35, 1634),
+            new THREE.Vector3(9443, 35, 1922),
+            new THREE.Vector3(10100,35,1000), new THREE.Vector3(10000,35,2000), new THREE.Vector3(10000,35,200),
+            new THREE.Vector3(10200,35,800), new THREE.Vector3(9900,35,1800), new THREE.Vector3(10150,35,0),
+            new THREE.Vector3(10300,35,1200), new THREE.Vector3(9800,35,2200), new THREE.Vector3(10050,35,-200),
+            new THREE.Vector3(10400,35,1500), new THREE.Vector3(9700,35,1600), new THREE.Vector3(9950,35,400)
+        ];
+    }
+
+    // Pick 3 random unique questions
+    const selectedQuestions = [];
+    while(selectedQuestions.length < 3){
+        const rand = questionPool[Math.floor(Math.random() * questionPool.length)];
+        if(!selectedQuestions.includes(rand)) selectedQuestions.push(rand);
+    }
+
+    // Pick 3 random unique positions
+    const selectedPositions = [];
+    const shuffledPositions = [...possiblePositions].sort(() => 0.5 - Math.random());
+    
+    for(let i = 0; i < 3; i++){
+        selectedPositions.push(shuffledPositions[i]);
+    }
+
+    // Create spheres at random positions
+    for(let i = 0; i < 3; i++){
+        const geometry = new THREE.SphereGeometry(3, 32, 32);
+        const material = new THREE.MeshStandardMaterial({
+            color: 0xffff00,
+            emissive: 0xffcc00,
+            emissiveIntensity: 1.5,
+            metalness: 0.3,
+            roughness: 0.2
+        });
+        const sphere = new THREE.Mesh(geometry, material);
+        sphere.position.copy(selectedPositions[i]);
+        sphere.trivia = selectedQuestions[i];
+
+        sphere.baseY = selectedPositions[i].y;
+
+        scene.add(sphere);
+        checkpoints.push(sphere);
+
+        // Add glowing light
+        const glow = new THREE.PointLight(0xffdd33, 1.2, 50);
+        glow.position.copy(selectedPositions[i]);
+        scene.add(glow);
+
+        // Add circular shadow
+        const shadowGeo = new THREE.CircleGeometry(6, 32);
+        const shadowMat = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.DoubleSide
+        });
+        const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+        shadow.rotation.x = -Math.PI / 2;
+
+        // Position shadow on ground
+        const raycaster = new THREE.Raycaster();
+        const down = new THREE.Vector3(0, -1, 0);
+        raycaster.set(new THREE.Vector3(selectedPositions[i].x, selectedPositions[i].y + 100, selectedPositions[i].z), down);
+        const intersects = raycaster.intersectObjects(collisionObjects, true);
+
+        if (intersects.length > 0) {
+            shadow.position.copy(intersects[0].point);
+            shadow.position.y += 0.05;
+        } else {
+            shadow.position.set(selectedPositions[i].x, 0.05, selectedPositions[i].z);
+        }
+
+        scene.add(shadow);
+        sphere.shadowCircle = shadow;
+    }
+    
+    
 }
 
 
