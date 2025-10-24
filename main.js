@@ -55,6 +55,8 @@ let menuDiv, keyCounterDiv;
 let isMenuOpen = false;
 let loadingScreenDiv;
 
+let keyModel;
+
 // Stage tracking
 let stage = 1;
 
@@ -226,7 +228,7 @@ function init() {
 
 
     // Load all GLTFs and only snap player after all loaded
-    let modelsToLoad = 3;
+    let modelsToLoad = 4;
     function onModelLoad() {
         modelsToLoad--;
         if (modelsToLoad === 0) {
@@ -265,6 +267,24 @@ function init() {
         onModelLoad();
     });
 
+    loader.load('public/key/scene.gltf', function(gltf) {
+        keyModel = gltf.scene;
+
+        // Don't scale the original - we'll scale the clones instead
+
+        keyModel.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
+        onModelLoad();
+    }, undefined, function(error) {
+        console.error("Error loading key model:", error);
+    });
+
+
     
 }
 
@@ -278,7 +298,6 @@ function init() {
         setTimeout(() => debugSkipTo(DEBUG_SKIP_TO_STAGE), 800);
     }*/
 
-    
 
 
 
@@ -453,37 +472,39 @@ function loadPlayer1() {
 
     }
 }*/
+
 function createCheckpoints() {
+    if (!keyModel) {
+        console.error("Key model not loaded yet!");
+        return;
+    }
+
     checkpoints = [];
-    keysCollected = 0; 
+    keysCollected = 0;
     updateKeyCounter();
 
-    // Select correct question pool
     let questionPool;
-    let possiblePositions; // Array of possible positions for each stage
-    
+    let possiblePositions;
+
     if(stage === 1){
         questionPool = easyQuestions;
-        // Multiple possible positions in street area
         possiblePositions = [
             new THREE.Vector3(-1849, 35, 1610),
             new THREE.Vector3(1957, 35, -738),
             new THREE.Vector3(-2033, 35, -3042),
             new THREE.Vector3(-5561, 35, 1526),
             new THREE.Vector3(-6178, 35, -749),
-            new THREE.Vector3(-6075, 35, 3882),
+
             new THREE.Vector3(-4178, 35, -4055),
             new THREE.Vector3(-4163, 35, -3094),
             new THREE.Vector3(-4940, 35, -2467),
             new THREE.Vector3(-4167, 35, 1672),
             new THREE.Vector3(-3943,35,-3032), new THREE.Vector3(-4193,35,-1446), new THREE.Vector3(-5679,35,-92),
             new THREE.Vector3(-3500,35,-2500), new THREE.Vector3(-4500,35,-1800), new THREE.Vector3(-5200,35,-800),
-            new THREE.Vector3(-3800,35,-3200), new THREE.Vector3(-4800,35,-2200), new THREE.Vector3(-5500,35,-500),
-            new THREE.Vector3(-3200,35,-2800), new THREE.Vector3(-4400,35,-1200), new THREE.Vector3(-5800,35,-200)
+            new THREE.Vector3(-3800,35,-3200), new THREE.Vector3(-4800,35,-2200)
         ];
     } else if(stage === 2){
         questionPool = mediumQuestions;
-        // Multiple possible positions in warehouse area
         possiblePositions = [
             new THREE.Vector3(84, 35, -862),
             new THREE.Vector3(988, 35, -937),
@@ -502,7 +523,6 @@ function createCheckpoints() {
         ];
     } else {
         questionPool = hardQuestions;
-        // Multiple possible positions in alleyway area
         possiblePositions = [
             new THREE.Vector3(10065, 35, 983),
             new THREE.Vector3(9917, 35, 1688),
@@ -523,91 +543,92 @@ function createCheckpoints() {
         ];
     }
 
-    // Pick 3 random unique questions
     const selectedQuestions = [];
     while(selectedQuestions.length < 3){
         const rand = questionPool[Math.floor(Math.random() * questionPool.length)];
         if(!selectedQuestions.includes(rand)) selectedQuestions.push(rand);
     }
 
-    // Pick 3 random unique positions
     const selectedPositions = [];
     const shuffledPositions = [...possiblePositions].sort(() => 0.5 - Math.random());
-    
+
     for(let i = 0; i < 3; i++){
         selectedPositions.push(shuffledPositions[i]);
     }
 
-    // Create spheres at random positions
     for(let i = 0; i < 3; i++){
-        const geometry = new THREE.SphereGeometry(3, 32, 32);
-        const material = new THREE.MeshStandardMaterial({
-            color: 0xffff00,
-            emissive: 0xffcc00,
-            emissiveIntensity: 1.5,
-            metalness: 0.3,
-            roughness: 0.2
+        // Clone the key model with deep clone
+        const key = keyModel.clone(true);
+
+        // Set scale for the cloned key - adjust this to your preference
+        key.scale.set(250, 250, 250);
+
+        // Apply golden/yellow material to make it stand out
+        key.traverse((child) => {
+            if (child.isMesh || child.isSkinnedMesh) {
+                // Clone the material if it exists, or create a new one
+                if (child.material) {
+                    child.material = child.material.clone();
+                } else {
+                    child.material = new THREE.MeshStandardMaterial();
+                }
+
+                child.material.emissive = new THREE.Color(0xffcc00);
+                child.material.emissiveIntensity = 3.0;
+                child.material.color = new THREE.Color(0xffff00);
+                child.material.metalness = 0.8;
+                child.material.roughness = 0.2;
+                child.material.side = THREE.DoubleSide;
+                child.castShadow = true;
+                child.receiveShadow = true;
+                child.visible = true;
+                child.frustumCulled = false;
+            }
         });
-        const sphere = new THREE.Mesh(geometry, material);
-        sphere.position.copy(selectedPositions[i]);
-        sphere.trivia = selectedQuestions[i];
 
-        sphere.baseY = selectedPositions[i].y;
+        key.position.copy(selectedPositions[i]);
+        key.trivia = selectedQuestions[i];
+        key.baseY = selectedPositions[i].y;
+        key.visible = true;
 
-        scene.add(sphere);
-        checkpoints.push(sphere);
+        // Add rotation for visual appeal (keys rotating in place)
+        key.rotation.y = Math.random() * Math.PI * 2;
 
-        // Add glowing light
+        scene.add(key);
+        checkpoints.push(key);
+
+        // Add point light for glow effect
         const glow = new THREE.PointLight(0xffdd33, 1.2, 50);
         glow.position.copy(selectedPositions[i]);
+        glow.castShadow = true;
+        glow.shadow.mapSize.width = 256;
+        glow.shadow.mapSize.height = 256;
         scene.add(glow);
 
-        // Add circular shadow
-        const shadowGeo = new THREE.CircleGeometry(6, 32);
-        const shadowMat = new THREE.MeshBasicMaterial({
-            color: 0x000000,
-            transparent: true,
-            opacity: 0.4,
-            side: THREE.DoubleSide
-        });
-        const shadow = new THREE.Mesh(shadowGeo, shadowMat);
-        shadow.rotation.x = -Math.PI / 2;
-
-        // Position shadow on ground
-        const raycaster = new THREE.Raycaster();
-        const down = new THREE.Vector3(0, -1, 0);
-        raycaster.set(new THREE.Vector3(selectedPositions[i].x, selectedPositions[i].y + 100, selectedPositions[i].z), down);
-        const intersects = raycaster.intersectObjects(collisionObjects, true);
-
-        if (intersects.length > 0) {
-            shadow.position.copy(intersects[0].point);
-            shadow.position.y += 0.05;
-        } else {
-            shadow.position.set(selectedPositions[i].x, 0.05, selectedPositions[i].z);
-        }
-
-        scene.add(shadow);
-        sphere.shadowCircle = shadow;
+        // Store reference to glow light so we can remove it later
+        key.glowLight = glow;
     }
-    
-    
 }
 
 
 function showTrivia(sphere){
     // Pause gameplay and show trivia UI
     isTriviaActive = true;
+
+    // Exit pointer lock so user can click buttons
+    document.exitPointerLock();
+
     currentCheckpoint = sphere;
     const data = sphere.trivia;
     const triviaDiv = document.createElement('div');
     triviaDiv.id = "triviaDiv";
     // (Styles are unchanged)
-    triviaDiv.style.position = 'absolute'; triviaDiv.style.top = '50%'; triviaDiv.style.left = '50%'; triviaDiv.style.transform = 'translate(-50%, -50%)'; triviaDiv.style.padding = '20px'; triviaDiv.style.backgroundColor = 'rgba(0,0,0,0.8)'; triviaDiv.style.color = 'white'; triviaDiv.style.fontFamily = 'Arial'; triviaDiv.style.fontSize = '20px'; triviaDiv.style.textAlign = 'center'; triviaDiv.style.borderRadius = '10px';
+    triviaDiv.style.position = 'absolute'; triviaDiv.style.top = '50%'; triviaDiv.style.left = '50%'; triviaDiv.style.transform = 'translate(-50%, -50%)'; triviaDiv.style.padding = '20px'; triviaDiv.style.backgroundColor = 'rgba(0,0,0,0.8)'; triviaDiv.style.color = 'white'; triviaDiv.style.fontFamily = 'Arial'; triviaDiv.style.fontSize = '20px'; triviaDiv.style.textAlign = 'center'; triviaDiv.style.borderRadius = '10px'; triviaDiv.style.zIndex = '500'; triviaDiv.style.cursor = 'default';
     triviaDiv.innerHTML = `<p>${data.question}</p>`;
     data.answers.forEach(ans => {
         const btn = document.createElement('button');
         btn.innerText = ans;
-        btn.style.margin = '5px'; btn.style.padding = '10px';
+        btn.style.margin = '5px'; btn.style.padding = '10px'; btn.style.cursor = 'pointer'; btn.style.zIndex = '501';
         btn.onclick = () => {
             if(ans === data.correct){
                 alert("Correct!");
@@ -626,7 +647,10 @@ function showTrivia(sphere){
                 if(idx !== -1) checkpoints.splice(idx,1);
                 triviaDiv.remove();
 
-                // ensure player is snapped back to ground to avoid falling through
+                if (sphere.glowLight) {
+                    scene.remove(sphere.glowLight);
+                }
+                        // ensure player is snapped back to ground to avoid falling through
                 //snapPlayerToGround();
 
                 if(checkpoints.length === 0 && isTimerRunning){
@@ -1096,13 +1120,25 @@ function animate() {
 
             // Make spheres pulse
         const time = Date.now() * 0.003; // slow pulse
-        checkpoints.forEach((sphere, index) => {
-            if (sphere.material && sphere.material.emissive) {
-                // Pulse between 0.5 and 2.0
-                const intensity = 1 + Math.sin(time + index) * 0.5;
-                sphere.material.emissiveIntensity = intensity;
+        checkpoints.forEach((key, index) => {
+            // Animate emissive intensity for glow effect
+            key.traverse((child) => {
+                if (child.isMesh && child.material && child.material.emissive) {
+                    const intensity = 1 + Math.sin(time + index) * 0.5;
+                    child.material.emissiveIntensity = intensity;
+                }
+            });
+    
+            // Animate position (floating effect)
+            key.position.y = key.baseY + Math.sin(time + index) * 2;
+    
+            // Animate rotation (spinning keys)
+            key.rotation.y += delta * 2; // Rotate keys continuously
+    
+            // Update glow light position to follow key
+            if (key.glowLight) {
+                key.glowLight.position.copy(key.position);
             }
-        sphere.position.y = sphere.baseY + Math.sin(time + index) * 2; // amplitude = 2
         });
 
     // safety net – snap every 2s
