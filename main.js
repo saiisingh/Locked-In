@@ -993,7 +993,7 @@ function updatePlayer(delta) {
     const isMoving = moveX !== 0 || moveZ !== 0;
 
     if (action) action.paused = !isMoving;
-    
+
     if (isMoving) {
         let moveDirection = new THREE.Vector3(moveX, 0, moveZ);
         moveDirection.normalize();
@@ -1016,23 +1016,56 @@ function updatePlayer(delta) {
         const playerCenter = player.position.clone().add(new THREE.Vector3(0, playerHeight / 2, 0));
         raycaster.set(playerCenter, moveDirection);
         raycaster.far = playerColliderRadius;
+
         if (raycaster.intersectObjects(collisionObjects, true).length === 0) {
             player.position.add(moveVector);
         }
+
+        // --- Restart game if player leaves the current model bounds ---
+        if (stage === 1) {
+            // Street model bounds
+            const minX = -7000, maxX = -1000;
+            const minZ = -4500, maxZ = 2500;
+            if (
+                player.position.x < minX || player.position.x > maxX ||
+                player.position.z < minZ || player.position.z > maxZ
+            ) {
+                alert("You left the playable street area!");
+                location.reload();
+            }
+        } else if (stage === 2) {
+            // Londonstreet model bounds
+            const minX = -1000, maxX = 2000;
+            const minZ = -2000, maxZ = 3500;
+            if (
+                player.position.x < minX || player.position.x > maxX ||
+                player.position.z < minZ || player.position.z > maxZ
+            ) {
+                alert("You left the warehouse area!");
+                location.reload();
+            }
+        } else if (stage === 3) {
+            // Alleyway model bounds
+            const minX = 9500, maxX = 11000;
+            const minZ = -1000, maxZ = 3000;
+            if (
+                player.position.x < minX || player.position.x > maxX ||
+                player.position.z < minZ || player.position.z > maxZ
+            ) {
+                alert("You left the alleyway area!");
+                location.reload();
+            }
+        }
+        // --- End of boundary check ---
+
         if (!runningSound.isPlaying) runningSound.play();
-        // reset idle timer when moving
         idleTimer = 0;
-        
-    }
-    else {
-        // accumulate idle time when standing still
+    } else {
         idleTimer += delta;
-         if (runningSound.isPlaying) runningSound.stop();
+        if (runningSound.isPlaying) runningSound.stop();
         if (idleTimer > 3.0) {
-            // periodically re-snap to ground to avoid slow drift-through
             snapPlayerToGround();
             idleTimer = 0;
-         
         }
     }
 
@@ -1044,15 +1077,13 @@ function updatePlayer(delta) {
     yVelocity += gravity * delta;
     player.position.y += yVelocity * delta;
 
-    // Cast from above the player to reliably find ground under various terrain
     const groundRayOrigin = player.position.clone().add(new THREE.Vector3(0, 200, 0));
     raycaster.set(groundRayOrigin, new THREE.Vector3(0, -1, 0));
-    raycaster.far = 500; // allow long falls to be detected
+    raycaster.far = 500;
     const groundIntersects = raycaster.intersectObjects(collisionObjects, true);
 
     if (groundIntersects.length > 0) {
         const groundY = groundIntersects[0].point.y;
-        // Add a small tolerance so the player doesn't jitter or fall through
         if (player.position.y <= groundY + 0.5) { 
             player.position.y = groundY + 0.5;
             yVelocity = 0;
@@ -1062,6 +1093,7 @@ function updatePlayer(delta) {
         isGrounded = false;
     }
 }
+
 
 function updateCamera(delta) {
     if (!player) return;
