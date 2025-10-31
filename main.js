@@ -489,58 +489,101 @@ function createCheckpoints() {
     if(stage === 1){
         questionPool = easyQuestions;
         possiblePositions = [
-            new THREE.Vector3(-1849, 35, 1610),
-            new THREE.Vector3(1957, 35, -738),
-            new THREE.Vector3(-2033, 35, -3042),
-            new THREE.Vector3(-5561, 35, 1526),
-            new THREE.Vector3(-6178, 35, -749),
-
-            new THREE.Vector3(-4178, 35, -4055),
-            new THREE.Vector3(-4163, 35, -3094),
-            new THREE.Vector3(-4940, 35, -2467),
-            new THREE.Vector3(-4167, 35, 1672),
-            new THREE.Vector3(-3943,35,-3032), new THREE.Vector3(-4193,35,-1446), new THREE.Vector3(-5679,35,-92),
-            new THREE.Vector3(-3500,35,-2500), new THREE.Vector3(-4500,35,-1800), new THREE.Vector3(-5200,35,-800),
-            new THREE.Vector3(-3800,35,-3200), new THREE.Vector3(-4800,35,-2200)
+            new THREE.Vector3(-2324.99, 40, -624.73),
+             new THREE.Vector3(-2333.19, 40, -905.54),
+              new THREE.Vector3(-2341.72, 40, -1250.63),
+               new THREE.Vector3(-2389.13, 40, -1636.83),
+                new THREE.Vector3(-2435.75, 40, -1938.19),
+                 new THREE.Vector3(-2499.43, 40, -2232.60),
+                  new THREE.Vector3(-3314.72, 40, -2987.90),
+                   new THREE.Vector3(-2554.16, 40, -2471.79),
+                    new THREE.Vector3(-3532.36, 40, -3034.43),
+                     new THREE.Vector3(-3937.79, 40, -3098.52),
+                      new THREE.Vector3(-2854.73, 40, -3593.64),
+                       new THREE.Vector3(-2474.01, 40, -3680.06),
+                        new THREE.Vector3(-2215.56, 40, -3780.83),
+                         new THREE.Vector3(-3138.23, 40, -4020.18),
+                          new THREE.Vector3(-3435.74, 40, -4007.63),
+                           new THREE.Vector3(-4706.47, 40, -2365.54),
+                            new THREE.Vector3(-4723.85, 40, -2256.47),
+                             new THREE.Vector3(-4620.40, 40, -1732.58),
+                              new THREE.Vector3(-4419.69, 40, -1500.97),
+                               new THREE.Vector3(-4097.37, 40, -1353.72),
+                                new THREE.Vector3(-3954.72, 40, -1487.31),
+                                 new THREE.Vector3(-4019.43, 40, -1450.51),
+                                  new THREE.Vector3(-4171.25, 40, -1436.73),
+                                   new THREE.Vector3(-4783.83, 40, -876.25),
+                                    new THREE.Vector3(-5247.56, 40, -465.34),
+                                     new THREE.Vector3(-5571.89, 40, -529.80),
+                                      new THREE.Vector3(-6015.43, 40, -344.31),
+                                       new THREE.Vector3(-5955.44, 40, -72.23),
+                                        new THREE.Vector3(-5769.02, 40, 108.67),
+                                         new THREE.Vector3(-5116.80, 40, 399.05),
+                                          new THREE.Vector3(-4913.02, 40, 518.15),
+                                           new THREE.Vector3(-4647.31, 40, 549.59),
+                                            new THREE.Vector3(-4367.07, 40, 634.71),
+                                             new THREE.Vector3(-4070.79, 40, 623.30),
+                                              new THREE.Vector3(-3786.38, 40, 682.26)
+          
         ];
     } else if(stage === 2){
         questionPool = mediumQuestions;
         possiblePositions = [
-            new THREE.Vector3(84, 35, -862),
-            new THREE.Vector3(988, 35, -937),
-            new THREE.Vector3(863, 35, 256),
-            new THREE.Vector3(815, 35, 943),
-            new THREE.Vector3(256, 35, 1893),
-            new THREE.Vector3(923, 35, 2582),
-            new THREE.Vector3(299, 35, -318),
-            new THREE.Vector3(508, 35, 812),
-            new THREE.Vector3(138, 35, 1484),
-            new THREE.Vector3(133, 35, 29597),
-            new THREE.Vector3(300,35,2000), new THREE.Vector3(668,35,1000), new THREE.Vector3(632,35,-222),
-            new THREE.Vector3(500,35,1800), new THREE.Vector3(800,35,800), new THREE.Vector3(400,35,0),
-            new THREE.Vector3(200,35,1500), new THREE.Vector3(900,35,1200), new THREE.Vector3(600,35,-500),
-            new THREE.Vector3(100,35,2200), new THREE.Vector3(750,35,600), new THREE.Vector3(300,35,-300)
-        ];
+            new THREE.Vector3(472.51, 35, -404.29),
+            new THREE.Vector3(468.93, 35, -533.31),
+            new THREE.Vector3(511.20, 35, -444.05),
+            new THREE.Vector3(473.33, 35, 31.20),
+            new THREE.Vector3(395.69, 35, 383.04),
+            new THREE.Vector3(487.73, 35, 810.11),
+            new THREE.Vector3(467.12, 35, 1263.83),
+            new THREE.Vector3(479.31, 35, 1557.15),
+            new THREE.Vector3(676.22, 35, 1810.95),
+            new THREE.Vector3(772.90, 35, 2084.95),
+            new THREE.Vector3(853.10, 35, 2327.81),
+            new THREE.Vector3(864.68, 35, 2586.17),
+            new THREE.Vector3(695.73, 35, 2820.30),
+            new THREE.Vector3(499.64, 35, 2858.21),
+            new THREE.Vector3(276.57, 35, 2741.45),
+            new THREE.Vector3(127.82, 35, 2409.92),
+            new THREE.Vector3(201.29, 35, 2065.59),
+            new THREE.Vector3(297.93, 35, 1356.38),
+            new THREE.Vector3(190.73, 35, 842.74),
+            new THREE.Vector3(557.63, 35, 556.34),
+            new THREE.Vector3(771.37, 35, 13.97)];
     } else {
         questionPool = hardQuestions;
         possiblePositions = [
-            new THREE.Vector3(10065, 35, 983),
-            new THREE.Vector3(9917, 35, 1688),
-            new THREE.Vector3(9832, 35, 2097),
-            new THREE.Vector3(9945, 35, 476),
-            new THREE.Vector3(10284, 35, 130),
-            new THREE.Vector3(10795, 35, 221),
-            new THREE.Vector3(10917, 35, 344),
-            new THREE.Vector3(9907, 35, 1651),
-            new THREE.Vector3(9806, 35, 2146),
-            new THREE.Vector3(10076, 35, 170),
-            new THREE.Vector3(10101, 35, 1634),
-            new THREE.Vector3(9443, 35, 1922),
-            new THREE.Vector3(10100,35,1000), new THREE.Vector3(10000,35,2000), new THREE.Vector3(10000,35,200),
-            new THREE.Vector3(10200,35,800), new THREE.Vector3(9900,35,1800), new THREE.Vector3(10150,35,0),
-            new THREE.Vector3(10300,35,1200), new THREE.Vector3(9800,35,2200), new THREE.Vector3(10050,35,-200),
-            new THREE.Vector3(10400,35,1500), new THREE.Vector3(9700,35,1600), new THREE.Vector3(9950,35,400)
-        ];
+            new THREE.Vector3(9965.20, 35, 607.09),
+            new THREE.Vector3(9971.37, 35, 641.59),
+            new THREE.Vector3(9929.79, 35, 438.15),
+            new THREE.Vector3(10019.67, 35, 345.33),
+            new THREE.Vector3(10173.77, 35, 153.80),
+            new THREE.Vector3(10225.04, 35, 232.54),
+            new THREE.Vector3(10301.56, 35, 232.25),
+            new THREE.Vector3(10461.35, 35, 241.02),
+            new THREE.Vector3(10598.39, 35, 249.83),
+            new THREE.Vector3(10765.31, 35, 234.03),
+            new THREE.Vector3(10508.02, 35, 152.57),
+            new THREE.Vector3(10488.14, 35, 173.44),
+            new THREE.Vector3(10096.88, 35, 405.48),
+            new THREE.Vector3(10069.44, 35, 540.42),
+            new THREE.Vector3(10008.54, 35, 986.28),
+            new THREE.Vector3(9988.32, 35, 1197.76),
+            new THREE.Vector3(10048.18, 35, 1620.60),
+            new THREE.Vector3(10011.60, 35, 1833.16),
+            new THREE.Vector3(9955.64, 35, 1970.44),
+            new THREE.Vector3(9947.25, 35, 1975.32),
+            new THREE.Vector3(9842.80, 35, 2082.17),
+            new THREE.Vector3(9973.68, 35, 2034.16),
+            new THREE.Vector3(9645.58, 35, 1980.75),
+            new THREE.Vector3(9560.35, 35, 1945.47),
+            new THREE.Vector3(9445.47, 35, 1918.41),
+            new THREE.Vector3(9393.48, 35, 1964.65),
+            new THREE.Vector3(9257.94, 35, 1976.69),
+            new THREE.Vector3(9177.09, 35, 2053.46),
+            new THREE.Vector3(9140.51, 35, 2069.54)
+
+];
     }
 
     const selectedQuestions = [];
@@ -847,9 +890,9 @@ function showCredits() {
         <p>Game Design and Programming: </p>
         <p>Sayuri Singh</p>
         <p>Masuvhelele Thembiso</p>
-        <p>Aphile</p>
-        <p>Samu</p>
-        <p>Onana</p>
+        <p>Aphile Bulube</p>
+        <p>Samukelo Mathusi</p>
+        <p>Stelly Jane Ngono Onana</p>
         <p>Character model sourced from https://sketchfab.com/3d-models/rida-sidi-ben-ali-running-487e9e949e4a4ea3a8fd59df7e842830</p>
         <p>Level one model sourced from https://sketchfab.com/3d-models/low-poly-street-scene-d238a2d27e324b78af3ab15e2a09faeb</p>
         <p>Level two model sourced from https://sketchfab.com/3d-models/greater-london-highstreetshops-a80514d7781d4a388885ed00c263eb35</p>
@@ -1019,6 +1062,42 @@ function updatePlayer(delta) {
         if (raycaster.intersectObjects(collisionObjects, true).length === 0) {
             player.position.add(moveVector);
         }
+         // --- Restart game if player leaves the current model bounds ---
+        if (stage === 1) {
+            // Street model bounds
+            const minX = -7000, maxX = -1000;
+            const minZ = -4500, maxZ = 2500;
+            if (
+                player.position.x < minX || player.position.x > maxX ||
+                player.position.z < minZ || player.position.z > maxZ
+            ) {
+                alert("You left the playable street area!");
+                location.reload();
+            }
+        } else if (stage === 2) {
+            // Londonstreet model bounds
+            const minX = -1000, maxX = 2000;
+            const minZ = -2000, maxZ = 3500;
+            if (
+                player.position.x < minX || player.position.x > maxX ||
+                player.position.z < minZ || player.position.z > maxZ
+            ) {
+                alert("You left the warehouse area!");
+                location.reload();
+            }
+        } else if (stage === 3) {
+            // Alleyway model bounds
+            const minX = 8000, maxX = 12000;
+            const minZ = -1000, maxZ = 5000;
+            if (
+                player.position.x < minX || player.position.x > maxX ||
+                player.position.z < minZ || player.position.z > maxZ
+            ) {
+                alert("You left the alleyway area!");
+                location.reload();
+            }
+        }
+        // --- End of boundary check ---
         if (!runningSound.isPlaying) runningSound.play();
         // reset idle timer when moving
         idleTimer = 0;
